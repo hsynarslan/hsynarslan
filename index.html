@@ -2,25 +2,46 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>İş Takip</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="logo" aria-hidden="true">✓</span>
-      <div>
-        <h1>İş Takip</h1>
-        <p class="sub">Birimlere atanan işler</p>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="topbar">
+        <div class="brand">
+          <span class="logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <div>
+            <h1>İş Takip</h1>
+            <p class="sub">Birimlere atanan işler</p>
+          </div>
+        </div>
+        <div class="top-actions">
+          <span id="modeBadge" class="badge"></span>
+          <span id="userName" class="user"></span>
+          <button id="refreshBtn" class="btn on-hero" title="Excel'den yeniden yükle">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Yenile
+          </button>
+          <button id="loginBtn" class="btn on-hero" hidden>Microsoft ile giriş</button>
+          <button id="logoutBtn" class="btn on-hero" hidden>Çıkış</button>
+        </div>
       </div>
-    </div>
-    <div class="top-actions">
-      <span id="modeBadge" class="badge"></span>
-      <span id="userName" class="user"></span>
-      <button id="refreshBtn" class="btn ghost" title="Excel'den yeniden yükle">↻ Yenile</button>
-      <button id="loginBtn" class="btn primary" hidden>Microsoft ile giriş</button>
-      <button id="logoutBtn" class="btn ghost" hidden>Çıkış</button>
+
+      <div class="hero-body" id="heroBody" hidden>
+        <div class="hero-text">
+          <p class="hero-date" id="heroDate"></p>
+          <h2 class="hero-title" id="heroGreeting"></h2>
+          <p class="hero-summary" id="heroSummary"></p>
+        </div>
+        <div class="hero-ring" id="heroRing"></div>
+      </div>
     </div>
   </header>
 
@@ -34,35 +55,63 @@
     <section id="appView" hidden>
       <div class="stats" id="stats"></div>
 
-      <div class="panel">
-        <div class="panel-head">
-          <h2>Birim bazında durum</h2>
+      <div class="insights">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Birim performansı</h2>
+            <span class="panel-note">Birime tıklayarak listeyi süzün</span>
+          </div>
+          <div id="unitProgress" class="unit-progress"></div>
         </div>
-        <div id="unitProgress" class="unit-progress"></div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Durum dağılımı</h2>
+          </div>
+          <div id="statusChart" class="status-chart"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Yaklaşan terminler</h2>
+            <span class="panel-note">Gecikenler ve önümüzdeki 7 gün</span>
+          </div>
+          <ol id="upcoming" class="upcoming"></ol>
+        </div>
       </div>
 
       <div class="panel">
         <div class="panel-head toolbar">
-          <h2>Görevler</h2>
-          <div class="filters">
-            <input id="search" type="search" placeholder="Ara (görev, not, no)…" aria-label="Ara">
-            <select id="unitFilter" aria-label="Birim"></select>
-            <select id="statusFilter" aria-label="Durum"></select>
-            <label class="check"><input id="overdueOnly" type="checkbox"> Sadece gecikenler</label>
-            <label class="check"><input id="hideDone" type="checkbox"> Tamamlananları gizle</label>
-            <button id="newBtn" class="btn primary">+ Yeni görev</button>
+          <div class="toolbar-left">
+            <h2>Görevler</h2>
+            <div class="seg" role="tablist" aria-label="Görünüm">
+              <button id="viewList" class="seg-btn active" data-view="list" role="tab">Liste</button>
+              <button id="viewBoard" class="seg-btn" data-view="board" role="tab">Pano</button>
+            </div>
           </div>
+          <button id="newBtn" class="btn primary">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+            Yeni görev
+          </button>
         </div>
-        <div class="table-wrap">
+        <div class="filters">
+          <input id="search" type="search" placeholder="Ara: görev, not, no…" aria-label="Ara">
+          <select id="unitFilter" aria-label="Birim"></select>
+          <select id="statusFilter" aria-label="Durum"></select>
+          <label class="chip-toggle"><input id="overdueOnly" type="checkbox"> Sadece gecikenler</label>
+          <label class="chip-toggle"><input id="hideDone" type="checkbox"> Tamamlananları gizle</label>
+          <span id="resultCount" class="result-count"></span>
+        </div>
+
+        <div id="listView" class="table-wrap">
           <table class="tasks">
             <thead>
               <tr>
                 <th class="c-done">Bitti</th>
                 <th data-sort="id">No</th>
-                <th data-sort="unit">Birim</th>
                 <th data-sort="title">Görev</th>
+                <th data-sort="unit">Birim</th>
                 <th data-sort="priority">Öncelik</th>
-                <th data-sort="assigned">Atama</th>
                 <th data-sort="due">Termin</th>
                 <th data-sort="status">Durum</th>
                 <th></th>
@@ -70,8 +119,10 @@
             </thead>
             <tbody id="taskBody"></tbody>
           </table>
-          <p id="noRows" class="no-rows" hidden>Filtreye uyan görev yok.</p>
         </div>
+
+        <div id="boardView" class="board" hidden></div>
+        <p id="noRows" class="no-rows" hidden>Filtreye uyan görev yok.</p>
       </div>
     </section>
 
@@ -117,6 +168,7 @@
     </form>
   </dialog>
 
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.30.0/lib/msal-browser.min.js"></script>

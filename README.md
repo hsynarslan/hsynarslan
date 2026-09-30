@@ -15,8 +15,11 @@ Tarayıcı (index.html)  ──MSAL ile giriş──►  Microsoft Entra ID
 
 ## Özellikler
 
-- Özet kartları: toplam, tamamlanan, açık ve geciken iş sayısı, tamamlanma oranı
-- Birim bazında ilerleme çubukları (tıklayınca o birime göre filtreler)
+- Üst bantta günün özeti ve tamamlanma halkası
+- Özet kartları: toplam, tamamlanan, açık ve geciken iş sayısı (tıklayınca listeyi süzer)
+- Birim performansı: her birim için renkli simge, yüzde ve durum çubuğu (tıklayınca o birime göre süzer)
+- Durum dağılımı grafiği ve "Yaklaşan terminler" listesi (gecikenler ve önümüzdeki 7 gün)
+- **Liste** ve **Pano** görünümü; panoda kartları sürükleyerek durum değiştirme
 - Görev listesi: arama, birim/durum filtresi, "sadece gecikenler", sütuna göre sıralama
 - **Tek tıkla "bitti" işaretleme** → Excel'de `TamamlandıMı = TRUE`, `Durum = Tamamlandı`, `TamamlanmaTarihi = bugün`
 - Yeni görev ekleme ve düzenleme (görev numarası otomatik: `G-0001`, `G-0002`…)

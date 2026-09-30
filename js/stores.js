@@ -256,7 +256,7 @@
 
   // ---- Demo deposu (localStorage) -------------------------------------------
 
-  const DEMO_KEY = "istakip-demo-v1";
+  const DEMO_KEY = "istakip-demo-v2";
 
   function daysFromToday(n) {
     const d = new Date();
@@ -269,15 +269,20 @@
     const rows = [
       ["Satın Alma", "Yıllık kırtasiye ihalesi dosyasının hazırlanması", "Yüksek", -20, 5, "Devam Ediyor"],
       ["Satın Alma", "Tedarikçi performans raporu", "Orta", -30, -3, "Devam Ediyor"],
+      ["Satın Alma", "Temizlik malzemesi sipariş listesi", "Düşük", -14, -7, "Tamamlandı"],
       ["İnsan Kaynakları", "Eylül ayı eğitim planının yayınlanması", "Orta", -25, -10, "Tamamlandı"],
       ["İnsan Kaynakları", "Yeni personel oryantasyon dokümanı", "Düşük", -5, 14, "Atandı"],
+      ["İnsan Kaynakları", "Yıllık izin planlamasının toplanması", "Orta", -9, 2, "Devam Ediyor"],
       ["Bilgi İşlem", "E-posta sunucusu lisans yenilemesi", "Yüksek", -15, -2, "Devam Ediyor"],
       ["Bilgi İşlem", "Yedekleme testlerinin raporlanması", "Orta", -12, -1, "Tamamlandı"],
       ["Bilgi İşlem", "Toplantı salonu ekran kurulumu", "Düşük", -3, 10, "Atandı"],
+      ["Bilgi İşlem", "Kullanıcı parola politikası güncellemesi", "Yüksek", -6, 0, "Devam Ediyor"],
       ["Muhasebe", "3. çeyrek bütçe gerçekleşme tablosu", "Yüksek", -10, 3, "Devam Ediyor"],
       ["Muhasebe", "Avans kapama listesinin kontrolü", "Orta", -18, -6, "Tamamlandı"],
+      ["Muhasebe", "Demirbaş sayım tutanaklarının mutabakatı", "Orta", -4, 1, "Atandı"],
       ["İdari İşler", "Araç muayene takvimi", "Orta", -8, -4, "Atandı"],
-      ["İdari İşler", "Bina yangın tatbikatı organizasyonu", "Yüksek", -2, 21, "Atandı"]
+      ["İdari İşler", "Bina yangın tatbikatı organizasyonu", "Yüksek", -2, 21, "Atandı"],
+      ["İdari İşler", "Kış dönemi ısınma bakımı", "Orta", -21, -9, "Tamamlandı"]
     ];
     const tasks = rows.map(([unit, title, priority, a, d, status], i) => ({
       id: "G-" + String(i + 1).padStart(4, "0"),
