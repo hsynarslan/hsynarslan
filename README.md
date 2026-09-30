@@ -13,6 +13,8 @@ Tarayıcı (index.html)  ──MSAL ile giriş──►  Microsoft Entra ID
                                                      └─ Özet      (formüller)
 ```
 
+> Ayrıca: [`spor-rezervasyon/`](spor-rezervasyon/) — spor tesisi rezervasyon sistemi için tıklanabilir arayüz prototipi.
+
 ## Özellikler
 
 - Üst bantta günün özeti ve tamamlanma halkası
