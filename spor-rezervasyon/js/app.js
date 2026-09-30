@@ -130,7 +130,7 @@
       </div></header>`;
   }
   function bindNav() {
-    $("#logout").onclick = () => { session = null; safeSet("spor-rezervasyon-session", null); location.hash = ""; render(); };
+    $("#logout").onclick = () => { session = null; safeSet("spor-rezervasyon-session", null); history.replaceState(null, "", location.pathname); render(); };
   }
 
   function toast(msg) {
@@ -172,8 +172,7 @@
       else if (!db.users[u]) err = "Kullanıcı adı veya şifre hatalı.";
       if (err) { $("#loginError").innerHTML = alertBox("danger", "ti-alert-circle", err); return; }
       session = u; safeSet("spor-rezervasyon-session", u);
-      location.hash = me().waiver ? "home" : "waiver";
-      render();
+      go(me().waiver ? "home" : "waiver");
     };
   }
 
