@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>İş Takip</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">✓</span>
+      <div>
+        <h1>İş Takip</h1>
+        <p class="sub">Birimlere atanan işler</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span id="modeBadge" class="badge"></span>
+      <span id="userName" class="user"></span>
+      <button id="refreshBtn" class="btn ghost" title="Excel'den yeniden yükle">↻ Yenile</button>
+      <button id="loginBtn" class="btn primary" hidden>Microsoft ile giriş</button>
+      <button id="logoutBtn" class="btn ghost" hidden>Çıkış</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="signedOut" class="empty-state" hidden>
+      <h2>Giriş yapın</h2>
+      <p>Excel dosyasına erişmek için Microsoft 365 hesabınızla giriş yapın.</p>
+      <button class="btn primary" data-action="login">Microsoft ile giriş</button>
+    </section>
+
+    <section id="appView" hidden>
+      <div class="stats" id="stats"></div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Birim bazında durum</h2>
+        </div>
+        <div id="unitProgress" class="unit-progress"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head toolbar">
+          <h2>Görevler</h2>
+          <div class="filters">
+            <input id="search" type="search" placeholder="Ara (görev, not, no)…" aria-label="Ara">
+            <select id="unitFilter" aria-label="Birim"></select>
+            <select id="statusFilter" aria-label="Durum"></select>
+            <label class="check"><input id="overdueOnly" type="checkbox"> Sadece gecikenler</label>
+            <label class="check"><input id="hideDone" type="checkbox"> Tamamlananları gizle</label>
+            <button id="newBtn" class="btn primary">+ Yeni görev</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="tasks">
+            <thead>
+              <tr>
+                <th class="c-done">Bitti</th>
+                <th data-sort="id">No</th>
+                <th data-sort="unit">Birim</th>
+                <th data-sort="title">Görev</th>
+                <th data-sort="priority">Öncelik</th>
+                <th data-sort="assigned">Atama</th>
+                <th data-sort="due">Termin</th>
+                <th data-sort="status">Durum</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="taskBody"></tbody>
+          </table>
+          <p id="noRows" class="no-rows" hidden>Filtreye uyan görev yok.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="loading" class="empty-state">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Yükleniyor…</p>
+    </section>
+  </main>
+
+  <dialog id="taskDialog">
+    <form id="taskForm" method="dialog">
+      <h2 id="dialogTitle">Yeni görev</h2>
+      <div class="grid">
+        <label class="full">Görev tanımı
+          <textarea name="title" rows="2" required></textarea>
+        </label>
+        <label>Birim
+          <select name="unit" required></select>
+        </label>
+        <label>Öncelik
+          <select name="priority"></select>
+        </label>
+        <label>Atama tarihi
+          <input name="assigned" type="date">
+        </label>
+        <label>Termin tarihi
+          <input name="due" type="date">
+        </label>
+        <label>Durum
+          <select name="status"></select>
+        </label>
+        <label>Tamamlanma tarihi
+          <input name="doneDate" type="date">
+        </label>
+        <label class="full">Not
+          <textarea name="note" rows="2"></textarea>
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn ghost" data-action="cancel">Vazgeç</button>
+        <button type="submit" class="btn primary">Kaydet</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.30.0/lib/msal-browser.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/stores.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
