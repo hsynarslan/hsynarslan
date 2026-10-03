@@ -39,8 +39,8 @@ yalnızca bir kez yapılır. Ekranınız İngilizceyse menü adları parantez i�
 6. "Kurulum tamamlandı" penceresi açılır ve içinde **bağlantı anahtarınız** yazar. Bu pencereyi kapatabilirsiniz;
    anahtarı istediğiniz zaman **İş Takip → 2. Bağlantı anahtarını göster** menüsünden tekrar görebilirsiniz.
 
-✅ **Kontrol:** E-Tabloda **Görevler** ve **Birimler** adlı iki sayfa var. **Birimler** sayfasındaki
-"Örnek Birim" satırlarını kendi birimlerinizle değiştirin.
+✅ **Kontrol:** E-Tabloda **Görevler**, **Birimler** ve **AltGörevler** sayfaları var. Birimleri E-Tablodan ya da
+web sayfasındaki **Birimleri yönet** düğmesinden kendi birimlerinizle değiştirin.
 
 ## 4. Web uygulaması olarak yayınlayın (3 dk)
 
@@ -85,9 +85,23 @@ Bağlantı bilgileri yalnızca o tarayıcıda saklanır. Telefonda ya da başka 
 
 ## Kodu güncellemek gerekirse
 
-Kod.gs'in yeni bir sürümünü yapıştırdıktan sonra değişikliğin yayına girmesi için:
-**Dağıt → Dağıtımları yönet** (Manage deployments) → kalem simgesi → **Sürüm: Yeni sürüm** → **Dağıt**.
-Web uygulaması adresi değişmez.
+Sayfada **"Google tarafındaki kodu güncelleyin"** uyarısı görüyorsanız E-Tablodaki köprü kodunun yeni sürümü
+gerekiyor. Örneğin birim yönetimi ve alt paketler 2. sürümle geldi. Verileriniz silinmez; yaklaşık 3 dakika sürer.
+
+1. E-Tablonuzu açın ve **Uzantılar → Apps Script** yolunu izleyin.
+2. Kod alanındaki her şeyi silin (Ctrl+A, ardından Delete).
+3. https://github.com/hsynarslan/hsynarslan/blob/main/google-sheets/Kod.gs adresinden kodu yeniden kopyalayıp
+   yapıştırın ve **💾 Kaydet** deyin.
+4. **Dağıt → Dağıtımları yönet** (Manage deployments) yolunu izleyin.
+5. Listedeki dağıtımın sağındaki **kalem simgesine** (Düzenle) tıklayın.
+6. **Sürüm** (Version) açılır listesinden **Yeni sürüm** (New version) seçin ve **Dağıt** (Deploy) deyin.
+   Yeniden izin isterse 3. adımdaki gibi onaylayın.
+7. E-Tablo sekmesine dönüp sayfayı yenileyin ve **İş Takip → 1. Kurulumu yap** menüsünü bir kez çalıştırın.
+   Bu adım yeni sayfaları (ör. **AltGörevler**) biçimlendirir; mevcut görevlerinize ve anahtarınıza dokunmaz.
+8. İş Takip sayfasını yenileyin. Uyarı kaybolur.
+
+> **"Yeni dağıtım" yapmayın.** Yeni dağıtım farklı bir adres üretir; o zaman sayfadaki Ayarlar'a yeni adresi
+> girmeniz gerekir. "Dağıtımları yönet → Yeni sürüm" yolu adresi aynı bırakır.
 
 ## Güvenlik
 

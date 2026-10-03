@@ -12,7 +12,13 @@
     units: [],
     sort: { key: "due", desc: false },
     view: "list",
-    editingId: null
+    editingId: null,
+    subs: [],
+    unitInfo: [],
+    features: {},
+    expanded: new Set(),
+    pendingSubs: [],
+    unitEdit: null
   };
 
   const MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
@@ -106,13 +112,53 @@
     return `<span class="pill st-${esc(String(s).replace(/\s/g, ""))}">${esc(s)}</span>`;
   }
 
+  // ---- Alt paket yardımcıları --------------------------------------------------
+
+  function subNum(x) { return parseInt(String(x.id).split(".").pop(), 10) || 0; }
+
+  function subsOf(taskId) {
+    return state.subs.filter((x) => x.taskId === taskId).sort((a, b) => subNum(a) - subNum(b));
+  }
+
+  function subDueCls(x) {
+    if (x.done) return "done";
+    const diff = daysBetween(todayIso(), x.due);
+    return diff < 0 ? "late" : diff <= 7 ? "soon" : "ok";
+  }
+
+  function subProgressHtml(t, asButton) {
+    const list = subsOf(t.id);
+    if (!state.features.subtasks || !list.length) return "";
+    const d = list.filter((x) => x.done).length;
+    const open = state.expanded.has(t.id);
+    const inner = `${asButton ? '<span class="chev" aria-hidden="true">▸</span>' : ""}${d}/${list.length} alt paket<span class="mini"><i style="width:${pct(d, list.length)}%"></i></span>`;
+    return asButton
+      ? `<button type="button" class="sub-progress ${open ? "open" : ""}" data-action="expand" aria-expanded="${open}">${inner}</button>`
+      : `<span class="sub-progress">${inner}</span>`;
+  }
+
+  function subItemHtml(x, opts) {
+    opts = opts || {};
+    return `<li class="${x.done ? "done" : ""}" data-sub="${esc(x.id || "")}"${opts.pending != null ? ` data-pending="${opts.pending}"` : ""}>
+      <input class="tick" type="checkbox" data-action="sub-toggle" ${x.done ? "checked" : ""} aria-label="Alt paket tamamlandı">
+      <span class="sub-title">${esc(x.title)}</span>
+      ${x.due ? `<span class="due-rel ${subDueCls(x)}">${fmtDate(x.due)}</span>` : "<span></span>"}
+      ${opts.deletable ? '<button type="button" class="sub-del" data-action="sub-delete" title="Alt paketi sil" aria-label="Alt paketi sil">×</button>' : "<span></span>"}
+    </li>`;
+  }
+
   let toastTimer;
   function toast(msg, isError) {
     const el = $("#toast");
     el.textContent = msg;
     el.className = "toast show" + (isError ? " error" : "");
+    // Popover olarak gösterilince açık bir pencerenin (dialog) da üstünde görünür.
+    if (el.showPopover) { try { el.hidePopover(); } catch (_) {} try { el.showPopover(); } catch (_) {} }
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => (el.className = "toast"), isError ? 6000 : 2500);
+    toastTimer = setTimeout(() => {
+      el.className = "toast";
+      if (el.hidePopover) { try { el.hidePopover(); } catch (_) {} }
+    }, isError ? 6000 : 2500);
   }
 
   function show(id) {
@@ -309,17 +355,30 @@
   }
 
   function renderTable(rows) {
-    $("#taskBody").innerHTML = rows.map((t) => `
+    $("#taskBody").innerHTML = rows.map((t) => {
+      const open = state.features.subtasks && state.expanded.has(t.id) && subsOf(t.id).length;
+      return `
       <tr class="${t.done ? "is-done" : ""} ${isLate(t) ? "is-late" : ""}" data-id="${esc(t.id)}">
         <td class="c-done"><input class="tick" type="checkbox" data-action="toggle" ${t.done ? "checked" : ""} aria-label="${esc(t.id)} tamamlandı"></td>
         <td class="t-id">${esc(t.id)}</td>
-        <td class="c-title"><div class="t-title">${esc(t.title)}</div>${t.note ? `<div class="t-note">${esc(t.note)}</div>` : ""}</td>
+        <td class="c-title"><div class="t-title">${esc(t.title)}</div>${t.note ? `<div class="t-note">${esc(t.note)}</div>` : ""}${subProgressHtml(t, true)}</td>
         <td><span class="unit-cell">${avatar(t.unit, true)}${esc(t.unit)}</span></td>
         <td>${prioHtml(t.priority)}</td>
         <td>${dueHtml(t)}</td>
         <td>${statusHtml(t.status)}</td>
         <td class="c-act"><button class="btn small ghost" data-action="edit">Düzenle</button></td>
-      </tr>`).join("");
+      </tr>${open ? `
+      <tr class="sub-row" data-parent="${esc(t.id)}">
+        <td class="c-done"></td>
+        <td colspan="7">
+          <ul class="sub-list">${subsOf(t.id).map((x) => subItemHtml(x)).join("")}</ul>
+          <form class="sub-inline" data-task="${esc(t.id)}">
+            <input name="title" type="text" placeholder="Yeni alt paket ekle…" aria-label="Yeni alt paket">
+            <button type="submit" class="btn small">Ekle</button>
+          </form>
+        </td>
+      </tr>` : ""}`;
+    }).join("");
 
     document.querySelectorAll(".tasks th[data-sort]").forEach((th) => {
       th.classList.toggle("sorted", th.dataset.sort === state.sort.key);
@@ -338,7 +397,7 @@
           return `<article class="card ${t.done ? "is-done" : ""} ${isLate(t) ? "is-late" : ""}" draggable="true" data-id="${esc(t.id)}">
             <div class="card-top">
               <input class="tick" type="checkbox" data-action="toggle" ${t.done ? "checked" : ""} aria-label="${esc(t.id)} tamamlandı">
-              <div class="card-title">${esc(t.title)}</div>
+              <div class="card-title">${esc(t.title)}${subProgressHtml(t, false) ? `<div>${subProgressHtml(t, false)}</div>` : ""}</div>
             </div>
             <div class="card-foot">
               <span class="unit-cell">${avatar(t.unit, true)}${esc(t.unit)}</span>
@@ -383,6 +442,11 @@
       const data = await state.store.load();
       state.tasks = data.tasks;
       state.units = data.units;
+      state.unitInfo = data.unitInfo || data.units.map((name) => ({ name, owner: "", email: "" }));
+      state.subs = data.subs || [];
+      state.features = state.store.features || {};
+      $("#unitsBtn").hidden = !state.features.units;
+      $("#updateBanner").hidden = !state.features.needsUpdate;
       render();
       show("#appView");
     } catch (e) {
@@ -394,8 +458,9 @@
 
   async function saveTask(task, isNew) {
     try {
+      let saved = task;
       if (isNew) {
-        const saved = await state.store.addTask(task, state.tasks);
+        saved = await state.store.addTask(task, state.tasks);
         state.tasks.push(saved);
         toast(`${saved.id} eklendi`);
       } else {
@@ -405,12 +470,12 @@
         toast(`${task.id} kaydedildi`);
       }
       render();
-      return true;
+      return saved;
     } catch (e) {
       console.error(e);
       toast(e.message || String(e), true);
       render();
-      return false;
+      return null;
     }
   }
 
@@ -435,6 +500,225 @@
     await saveTask(withStatus(t, status), false);
   }
 
+  // ---- Alt paket işlemleri --------------------------------------------------------
+
+  async function addSubFor(taskId, sub) {
+    const title = String(sub.title || "").trim();
+    if (!title) return null;
+    try {
+      const saved = await state.store.addSub({ taskId, title, due: sub.due || "", done: !!sub.done, doneDate: sub.done ? todayIso() : "" });
+      state.subs.push(saved);
+      return saved;
+    } catch (e) {
+      console.error(e);
+      toast(e.message || String(e), true);
+      return null;
+    }
+  }
+
+  async function toggleSub(id, checkbox) {
+    const x = state.subs.find((y) => y.id === id);
+    if (!x) return;
+    checkbox.disabled = true;
+    const updated = { ...x, done: checkbox.checked, doneDate: checkbox.checked ? todayIso() : "" };
+    try {
+      await state.store.updateSub(updated);
+      Object.assign(x, updated);
+      const parent = state.tasks.find((t) => t.id === x.taskId);
+      if (updated.done && parent && !parent.done && subsOf(x.taskId).every((y) => y.done)) {
+        toast(`Tüm alt paketler bitti. ${parent.id} numaralı görevi de tamamlandı olarak işaretleyebilirsiniz.`);
+      }
+    } catch (e) {
+      console.error(e);
+      toast(e.message || String(e), true);
+    }
+    renderFiltered();
+    renderDialogSubs();
+  }
+
+  async function deleteSub(id) {
+    try {
+      await state.store.deleteSub(id);
+      state.subs = state.subs.filter((x) => x.id !== id);
+    } catch (e) {
+      console.error(e);
+      toast(e.message || String(e), true);
+    }
+    renderFiltered();
+    renderDialogSubs();
+  }
+
+  function renderDialogSubs() {
+    const sec = $("#subsSection");
+    sec.hidden = !state.features.subtasks;
+    if (sec.hidden || !$("#taskDialog").open) return;
+    const list = state.editingId ? subsOf(state.editingId) : state.pendingSubs;
+    $("#subsList").innerHTML = list.map((x, i) =>
+      subItemHtml(x, { deletable: true, pending: state.editingId ? null : i })).join("") ||
+      `<li class="sub-empty">Henüz alt paket yok. Aşağıdan ekleyebilirsiniz.</li>`;
+    const d = list.filter((x) => x.done).length;
+    $("#subsCount").textContent = list.length ? `${d}/${list.length} tamamlandı` : "";
+  }
+
+  async function addSubFromDialog() {
+    const titleEl = $("#subTitle");
+    const title = titleEl.value.trim();
+    if (!title) { titleEl.focus(); return; }
+    const sub = { title, due: $("#subDue").value, done: false };
+    if (state.editingId) {
+      const btn = $("#subAddBtn");
+      btn.disabled = true;
+      const saved = await addSubFor(state.editingId, sub);
+      btn.disabled = false;
+      if (!saved) return;
+      renderFiltered();
+    } else {
+      state.pendingSubs.push(sub);
+    }
+    titleEl.value = "";
+    $("#subDue").value = "";
+    renderDialogSubs();
+    titleEl.focus();
+  }
+
+  async function onDialogSubsClick(e) {
+    const li = e.target.closest("li[data-sub]");
+    const action = e.target.dataset.action;
+    if (!li || !action) return;
+    if (li.dataset.pending !== undefined) {
+      const i = Number(li.dataset.pending);
+      if (action === "sub-toggle") state.pendingSubs[i].done = e.target.checked;
+      if (action === "sub-delete") state.pendingSubs.splice(i, 1);
+      renderDialogSubs();
+      return;
+    }
+    if (action === "sub-toggle") return toggleSub(li.dataset.sub, e.target);
+    if (action === "sub-delete") {
+      // İki adımlı silme: ilk tıklama onay ister
+      if (!e.target.classList.contains("confirm")) {
+        e.target.classList.add("confirm");
+        e.target.textContent = "Sil?";
+        e.target.title = "Silmek için tekrar tıklayın";
+        return;
+      }
+      await deleteSub(li.dataset.sub);
+    }
+  }
+
+  // ---- Birim yönetimi ----------------------------------------------------------
+
+  function unitsError(msg) {
+    const el = $("#unitsError");
+    el.textContent = msg || "";
+    el.hidden = !msg;
+  }
+
+  function renderUnits() {
+    $("#unitsBody").innerHTML = state.unitInfo.map((u) => {
+      const n = state.tasks.filter((t) => t.unit === u.name).length;
+      return `<tr class="${state.unitEdit === u.name ? "editing" : ""}" data-unit="${esc(u.name)}">
+        <td><span class="unit-cell">${avatar(u.name, true)}${esc(u.name)}</span></td>
+        <td>${u.owner ? esc(u.owner) : '<span class="muted">—</span>'}</td>
+        <td>${u.email ? esc(u.email) : '<span class="muted">—</span>'}</td>
+        <td class="num">${n}</td>
+        <td class="acts">
+          <button type="button" class="btn small ghost" data-action="unit-edit">Düzenle</button>
+          <button type="button" class="btn small ghost danger" data-action="unit-delete"${n ? ` disabled title="Bu birime bağlı ${n} iş var"` : ""}>Sil</button>
+        </td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="5" class="muted">Henüz birim yok. Aşağıdan ekleyin.</td></tr>`;
+  }
+
+  function resetUnitForm() {
+    state.unitEdit = null;
+    $("#unitName").value = "";
+    $("#unitOwner").value = "";
+    $("#unitEmail").value = "";
+    $("#unitFormTitle").textContent = "Yeni birim ekle";
+    $("#unitSubmit").textContent = "Birimi ekle";
+    $("#unitCancelEdit").hidden = true;
+    unitsError("");
+  }
+
+  function editUnit(name) {
+    const u = state.unitInfo.find((x) => x.name === name);
+    if (!u) return;
+    state.unitEdit = name;
+    $("#unitName").value = u.name;
+    $("#unitOwner").value = u.owner || "";
+    $("#unitEmail").value = u.email || "";
+    $("#unitFormTitle").textContent = `"${u.name}" birimini düzenle`;
+    $("#unitSubmit").textContent = "Değişiklikleri kaydet";
+    $("#unitCancelEdit").hidden = false;
+    unitsError("");
+    renderUnits();
+    $("#unitName").focus();
+  }
+
+  function openUnits() {
+    resetUnitForm();
+    renderUnits();
+    $("#unitsDialog").showModal();
+  }
+
+  async function submitUnit(ev) {
+    ev.preventDefault();
+    unitsError("");
+    const unit = { name: $("#unitName").value.trim(), owner: $("#unitOwner").value.trim(), email: $("#unitEmail").value.trim() };
+    if (!unit.name) { unitsError("Birim adını girin."); return; }
+    const oldName = state.unitEdit;
+    const btn = $("#unitSubmit");
+    btn.disabled = true;
+    try {
+      const r = await state.store.saveUnit(oldName, unit);
+      if (oldName) {
+        const i = state.unitInfo.findIndex((u) => u.name === oldName);
+        state.unitInfo[i] = r.unit;
+        if (oldName !== r.unit.name) state.tasks.forEach((t) => { if (t.unit === oldName) t.unit = r.unit.name; });
+      } else {
+        state.unitInfo.push(r.unit);
+      }
+      state.units = state.unitInfo.map((u) => u.name);
+      toast(oldName
+        ? (r.renamed ? `Birim güncellendi; ${r.renamed} iş yeni birim adına taşındı` : "Birim güncellendi")
+        : `"${r.unit.name}" eklendi`);
+      resetUnitForm();
+      renderUnits();
+      render();
+    } catch (e) {
+      unitsError(e.message || String(e));
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function onUnitsClick(e) {
+    const btn = e.target.closest("button[data-action]");
+    const row = e.target.closest("tr[data-unit]");
+    if (!btn || !row) return;
+    const name = row.dataset.unit;
+    if (btn.dataset.action === "unit-edit") return editUnit(name);
+    if (btn.dataset.action === "unit-delete") {
+      if (!btn.classList.contains("confirm")) {
+        btn.classList.add("confirm");
+        btn.textContent = "Emin misiniz?";
+        return;
+      }
+      btn.disabled = true;
+      try {
+        await state.store.deleteUnit(name);
+        state.unitInfo = state.unitInfo.filter((u) => u.name !== name);
+        state.units = state.unitInfo.map((u) => u.name);
+        if (state.unitEdit === name) resetUnitForm();
+        toast(`"${name}" silindi`);
+        render();
+      } catch (err) {
+        unitsError(err.message || String(err));
+      }
+      renderUnits();
+    }
+  }
+
   // ---- Form -------------------------------------------------------------------
 
   const FORM_FIELDS = ["title", "unit", "priority", "assigned", "due", "status", "doneDate", "note"];
@@ -451,7 +735,11 @@
       assigned: todayIso(), due: "", status: cfg.statuses[0], doneDate: "", note: ""
     };
     for (const f of FORM_FIELDS) form[f].value = t[f] || "";
+    state.pendingSubs = [];
+    $("#subTitle").value = "";
+    $("#subDue").value = "";
     $("#taskDialog").showModal();
+    renderDialogSubs();
     form.title.focus();
   }
 
@@ -465,9 +753,15 @@
 
     const btn = form.querySelector("[type=submit]");
     btn.disabled = true;
-    const ok = await saveTask(final, !state.editingId);
+    const isNew = !state.editingId;
+    const saved = await saveTask(final, isNew);
+    if (saved && isNew && state.pendingSubs.length) {
+      for (const sub of state.pendingSubs) await addSubFor(saved.id, sub);
+      state.expanded.add(saved.id);
+      renderFiltered();
+    }
     btn.disabled = false;
-    if (ok) $("#taskDialog").close();
+    if (saved) $("#taskDialog").close();
   }
 
   // ---- Olaylar ----------------------------------------------------------------
@@ -567,6 +861,33 @@
       renderFiltered();
     });
 
+    $("#taskBody").addEventListener("click", (e) => {
+      const subLi = e.target.closest("li[data-sub]");
+      if (subLi && e.target.dataset.action === "sub-toggle") toggleSub(subLi.dataset.sub, e.target);
+      const exp = e.target.closest("[data-action=expand]");
+      const row = e.target.closest("tr[data-id]");
+      if (exp && row) {
+        const id = row.dataset.id;
+        if (state.expanded.has(id)) state.expanded.delete(id); else state.expanded.add(id);
+        renderFiltered();
+      }
+    });
+    $("#taskBody").addEventListener("submit", async (e) => {
+      const form = e.target.closest("form.sub-inline");
+      if (!form) return;
+      e.preventDefault();
+      const input = form.querySelector("input");
+      if (!input.value.trim()) return;
+      input.disabled = true;
+      const saved = await addSubFor(form.dataset.task, { title: input.value });
+      input.disabled = false;
+      if (saved) {
+        renderFiltered();
+        const again = document.querySelector(`form.sub-inline[data-task="${CSS.escape(form.dataset.task)}"] input`);
+        if (again) again.focus();
+      }
+    });
+
     for (const id of ["#taskBody", "#boardView"]) {
       $(id).addEventListener("click", (e) => {
         const item = e.target.closest("[data-id]");
@@ -589,6 +910,14 @@
     });
 
     $("#newBtn").addEventListener("click", () => openDialog(null));
+    $("#subAddBtn").addEventListener("click", addSubFromDialog);
+    $("#subTitle").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addSubFromDialog(); } });
+    $("#subsList").addEventListener("click", onDialogSubsClick);
+    $("#unitsBtn").addEventListener("click", openUnits);
+    $("#unitsBody").addEventListener("click", onUnitsClick);
+    $("#unitForm").addEventListener("submit", submitUnit);
+    $("#unitCancelEdit").addEventListener("click", () => { resetUnitForm(); renderUnits(); });
+    $("#unitsDialog [data-action=close-units]").addEventListener("click", () => $("#unitsDialog").close());
     $("#taskForm").addEventListener("submit", submitDialog);
     $("#taskForm [data-action=cancel]").addEventListener("click", () => $("#taskDialog").close());
     $("#refreshBtn").addEventListener("click", load);

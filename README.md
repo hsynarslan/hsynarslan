@@ -12,7 +12,8 @@ Hiçbiri bağlı değilse sayfa örnek verilerle **demo modunda** açılır.
 ```
 Tarayıcı (index.html) ──fetch + bağlantı anahtarı──► Apps Script web uygulaması ──► Google E-Tablo
                                                                                     ├─ Görevler
-                                                                                    └─ Birimler
+                                                                                    ├─ Birimler
+                                                                                    └─ AltGörevler
 
 Tarayıcı (index.html)  ──MSAL ile giriş──►  Microsoft Entra ID
         │
@@ -34,6 +35,9 @@ Tarayıcı (index.html)  ──MSAL ile giriş──►  Microsoft Entra ID
 - Görev listesi: arama, birim/durum filtresi, "sadece gecikenler", sütuna göre sıralama
 - **Tek tıkla "bitti" işaretleme** → Excel'de `TamamlandıMı = TRUE`, `Durum = Tamamlandı`, `TamamlanmaTarihi = bugün`
 - Yeni görev ekleme ve düzenleme (görev numarası otomatik: `G-0001`, `G-0002`…)
+- **Alt paketler:** her işin altında işaretlenebilir alt paketler (`G-0001.1`, `G-0001.2`…); listede ilerleme
+  göstergesi ve tek tıkla açılan alt paket listesi
+- **Birim yönetimi:** web'den birim ekleme, düzenleme, silme; birim adı değişince bağlı işler de güncellenir
 - Termini geçmiş işler kırmızı işaretlenir, kaç gün geciktiği yazılır
 - Mobil uyumlu, açık ve koyu tema
 

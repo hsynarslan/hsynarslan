@@ -127,6 +127,8 @@
 
     get label() { return "Excel (Office 365)"; }
 
+    get features() { return { units: false, subtasks: false }; }
+
     async graph(method, path, body) {
       const token = await this.auth.token();
       const res = await fetch(path.startsWith("http") ? path : GRAPH + path, {
@@ -226,7 +228,7 @@
         // Birimler tablosu yoksa görevlerdeki birimler kullanılır.
       }
       if (!units.length) units = [...new Set(tasks.map((t) => t.unit).filter(Boolean))];
-      return { tasks, units };
+      return { tasks, units, unitInfo: units.map((name) => ({ name, owner: "", email: "" })), subs: [] };
     }
 
     async addTask(task, existing) {
@@ -257,9 +259,12 @@
   // ---- Google E-Tablolar deposu (Apps Script web uygulaması) -------------------
 
   class SheetsStore {
-    constructor(url, token) { this.url = url; this.token = token; }
+    constructor(url, token) { this.url = url; this.token = token; this.version = 0; }
 
     get label() { return "Google E-Tablolar"; }
+
+    // Birim yönetimi ve alt paketler Kod.gs'in 2. sürümüyle gelir.
+    get features() { return { units: this.version >= 2, subtasks: this.version >= 2, needsUpdate: this.version < 2 }; }
 
     async request(init, query) {
       let res;
@@ -280,10 +285,12 @@
 
     async load() {
       const data = await this.request({ method: "GET" }, "?action=load&token=" + encodeURIComponent(this.token));
+      this.version = data.version || 1;
       const tasks = data.tasks || [];
       let units = data.units || [];
       if (!units.length) units = [...new Set(tasks.map((t) => t.unit).filter(Boolean))];
-      return { tasks, units };
+      const unitInfo = data.unitInfo || units.map((name) => ({ name, owner: "", email: "" }));
+      return { tasks, units, unitInfo, subs: data.subs || [] };
     }
 
     // text/plain gövde, tarayıcının ön kontrol (CORS preflight) isteği atmasını engeller;
@@ -305,6 +312,19 @@
       await this.post({ action: "update", task });
       return task;
     }
+
+    async saveUnit(oldName, unit) {
+      const data = await this.post({ action: "unitSave", oldName: oldName || "", unit });
+      return { unit: data.unit, renamed: data.renamed || 0 };
+    }
+
+    async deleteUnit(name) { await this.post({ action: "unitDelete", name }); }
+
+    async addSub(sub) { return (await this.post({ action: "subAdd", sub })).sub; }
+
+    async updateSub(sub) { await this.post({ action: "subUpdate", sub }); return sub; }
+
+    async deleteSub(id) { await this.post({ action: "subDelete", id }); }
   }
 
   // ---- Demo deposu (localStorage) -------------------------------------------
@@ -347,13 +367,26 @@
       doneDate: status === "Tamamlandı" ? daysFromToday(d - 1) : "",
       note: ""
     }));
-    return { tasks, units };
+    const subs = [
+      ["G-0001", "Teknik şartnamenin hazırlanması", true],
+      ["G-0001", "Piyasa fiyat araştırması", true],
+      ["G-0001", "İhale onay yazısı", false],
+      ["G-0007", "Lisans tekliflerinin toplanması", true],
+      ["G-0007", "Satın alma talebinin açılması", false],
+      ["G-0011", "Gider kalemlerinin çekilmesi", false]
+    ].map(([taskId, title, done], i, arr) => ({
+      id: `${taskId}.${arr.slice(0, i).filter((x) => x[0] === taskId).length + 1}`,
+      taskId, title, due: "", done, doneDate: done ? daysFromToday(-2) : ""
+    }));
+    return { tasks, units, unitInfo: units.map((name) => ({ name, owner: "", email: "" })), subs };
   }
 
   class DemoStore {
     constructor(cfg) { this.cfg = cfg; this.data = null; }
 
     get label() { return "Demo (tarayıcı belleği)"; }
+
+    get features() { return { units: true, subtasks: true }; }
 
     persist() {
       try { localStorage.setItem(DEMO_KEY, JSON.stringify(this.data)); } catch (_) {}
@@ -365,6 +398,8 @@
         if (raw) this.data = JSON.parse(raw);
       } catch (_) {}
       if (!this.data) { this.data = demoSeed(); this.persist(); }
+      if (!this.data.unitInfo) this.data.unitInfo = this.data.units.map((name) => ({ name, owner: "", email: "" }));
+      if (!this.data.subs) this.data.subs = demoSeed().subs;
       return JSON.parse(JSON.stringify(this.data));
     }
 
@@ -381,6 +416,59 @@
       this.data.tasks[i] = { ...task };
       this.persist();
       return task;
+    }
+
+    async saveUnit(oldName, unit) {
+      const name = String(unit.name || "").trim();
+      if (!name) throw new Error("Birim adı boş olamaz.");
+      const key = (x) => String(x).toLocaleLowerCase("tr-TR");
+      const clash = this.data.unitInfo.find((u) => key(u.name) === key(name) && u.name !== oldName);
+      if (clash) throw new Error(`"${name}" adında bir birim zaten var.`);
+      const saved = { name, owner: unit.owner || "", email: unit.email || "" };
+      let renamed = 0;
+      if (oldName) {
+        const i = this.data.unitInfo.findIndex((u) => u.name === oldName);
+        if (i < 0) throw new Error(`"${oldName}" birimi bulunamadı.`);
+        this.data.unitInfo[i] = saved;
+        this.data.tasks.forEach((t) => { if (t.unit === oldName) { t.unit = name; renamed++; } });
+      } else {
+        this.data.unitInfo.push(saved);
+      }
+      this.data.units = this.data.unitInfo.map((u) => u.name);
+      this.persist();
+      return { unit: saved, renamed };
+    }
+
+    async deleteUnit(name) {
+      const n = this.data.tasks.filter((t) => t.unit === name).length;
+      if (n) throw new Error(`"${name}" birimine bağlı ${n} iş var. Önce bu işleri başka bir birime taşıyın.`);
+      this.data.unitInfo = this.data.unitInfo.filter((u) => u.name !== name);
+      this.data.units = this.data.unitInfo.map((u) => u.name);
+      this.persist();
+    }
+
+    async addSub(sub) {
+      const title = String(sub.title || "").trim();
+      if (!title) throw new Error("Alt paket tanımı boş olamaz.");
+      const max = this.data.subs.filter((x) => x.taskId === sub.taskId)
+        .reduce((m, x) => Math.max(m, parseInt(String(x.id).split(".").pop(), 10) || 0), 0);
+      const saved = { ...sub, title, id: `${sub.taskId}.${max + 1}` };
+      this.data.subs.push(saved);
+      this.persist();
+      return { ...saved };
+    }
+
+    async updateSub(sub) {
+      const i = this.data.subs.findIndex((x) => x.id === sub.id);
+      if (i < 0) throw new Error(`${sub.id} bulunamadı.`);
+      this.data.subs[i] = { ...sub };
+      this.persist();
+      return sub;
+    }
+
+    async deleteSub(id) {
+      this.data.subs = this.data.subs.filter((x) => x.id !== id);
+      this.persist();
     }
 
     reset() {

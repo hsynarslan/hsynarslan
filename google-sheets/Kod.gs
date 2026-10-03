@@ -8,6 +8,10 @@
 
 const SHEET_TASKS = "Görevler";
 const SHEET_UNITS = "Birimler";
+const SHEET_SUBS = "AltGörevler";
+
+// Web sayfası bu numaraya bakarak hangi özelliklerin desteklendiğini anlar.
+const API_VERSION = 2;
 
 // Alan adı -> E-Tablodaki başlık. Sütun sırası önemli değil, başlık adına göre eşleştirilir.
 const COLUMNS = {
@@ -21,6 +25,15 @@ const COLUMNS = {
   done: "TamamlandıMı",
   doneDate: "TamamlanmaTarihi",
   note: "Not"
+};
+const UNIT_COLUMNS = { code: "BirimKodu", name: "BirimAdı", owner: "Sorumlu", email: "E-posta" };
+const SUB_COLUMNS = {
+  id: "AltNo",
+  taskId: "GörevNo",
+  title: "Tanım",
+  due: "TerminTarihi",
+  done: "TamamlandıMı",
+  doneDate: "TamamlanmaTarihi"
 };
 const DATE_FIELDS = ["assigned", "due", "doneDate"];
 const STATUSES = ["Atandı", "Devam Ediyor", "Tamamlandı", "İptal"];
@@ -44,15 +57,19 @@ function kurulum() {
   const headers = Object.values(COLUMNS);
 
   // Birimler
-  let units = ss.getSheetByName(SHEET_UNITS);
-  if (!units) units = ss.insertSheet(SHEET_UNITS);
-  if (!units.getRange(1, 1).getValue()) {
-    units.getRange(1, 1, 1, 4).setValues([["BirimKodu", "BirimAdı", "Sorumlu", "E-posta"]]);
+  const unitsExisted = !!ss.getSheetByName(SHEET_UNITS);
+  const units = ensureSheet_(SHEET_UNITS, Object.values(UNIT_COLUMNS));
+  if (!unitsExisted || units.getLastRow() < 2) {
     units.getRange(2, 1, 3, 2).setValues([["B01", "Örnek Birim 1"], ["B02", "Örnek Birim 2"], ["B03", "Örnek Birim 3"]]);
   }
-  units.getRange(1, 1, 1, 4).setFontWeight("bold").setBackground("#0e2a3f").setFontColor("#ffffff");
-  units.setFrozenRows(1);
   units.setColumnWidths(1, 4, 160);
+
+  // Alt paketler
+  const subs = subsSheet_();
+  const sm = subMap_(subs);
+  subs.getRange(2, sm.done + 1, MAX_ROWS - 1, 1).insertCheckboxes();
+  [sm.due, sm.doneDate].forEach((c) => subs.getRange(2, c + 1, MAX_ROWS - 1, 1).setNumberFormat("dd.mm.yyyy"));
+  subs.setColumnWidth(sm.title + 1, 360);
 
   // Görevler
   let tasks = ss.getSheetByName(SHEET_TASKS);
@@ -98,7 +115,7 @@ function kurulum() {
   const token = getToken_(true);
   SpreadsheetApp.getUi().alert(
     "Kurulum tamamlandı",
-    "Görevler ve Birimler sayfaları hazır.\n\n" +
+    "Görevler, Birimler ve AltGörevler sayfaları hazır.\n\n" +
     "Bağlantı anahtarınız:\n" + token + "\n\n" +
     "Sonraki adım: Dağıt > Yeni dağıtım > Web uygulaması.\n" +
     "Anahtarı daha sonra İş Takip > Bağlantı anahtarını göster menüsünden de görebilirsiniz.",
@@ -137,9 +154,16 @@ function doPost(e) {
     const lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try {
-      if (body.action === "add") return { ok: true, task: addTask_(body.task) };
-      if (body.action === "update") return { ok: true, task: updateTask_(body.task) };
-      throw new Error("Bilinmeyen işlem: " + body.action);
+      switch (body.action) {
+        case "add": return { ok: true, task: addTask_(body.task) };
+        case "update": return { ok: true, task: updateTask_(body.task) };
+        case "unitSave": return Object.assign({ ok: true }, saveUnit_(body.oldName, body.unit));
+        case "unitDelete": return { ok: true, deleted: deleteUnit_(body.name) };
+        case "subAdd": return { ok: true, sub: addSub_(body.sub) };
+        case "subUpdate": return { ok: true, sub: updateSub_(body.sub) };
+        case "subDelete": return { ok: true, deleted: deleteSub_(body.id) };
+        default: throw new Error("Bilinmeyen işlem: " + body.action);
+      }
     } finally {
       lock.releaseLock();
     }
@@ -178,19 +202,53 @@ function normalize_(s) {
   return String(s || "").toLocaleLowerCase("tr-TR").replace(/[\s_.-]/g, "");
 }
 
-function headerMap_(sheet) {
+function columnsMap_(sheet, columns, required) {
   const lastCol = Math.max(sheet.getLastColumn(), 1);
   const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(normalize_);
   const map = {};
-  Object.keys(COLUMNS).forEach((field) => {
-    const i = headers.indexOf(normalize_(COLUMNS[field]));
+  Object.keys(columns).forEach((field) => {
+    const i = headers.indexOf(normalize_(columns[field]));
     if (i >= 0) map[field] = i;
   });
-  const missing = ["id", "unit", "title", "done"].filter((f) => !(f in map));
+  const missing = required.filter((f) => !(f in map));
   if (missing.length) {
-    throw new Error(SHEET_TASKS + " sayfasında eksik sütun: " + missing.map((f) => COLUMNS[f]).join(", "));
+    throw new Error(sheet.getName() + " sayfasında eksik sütun: " + missing.map((f) => columns[f]).join(", "));
   }
   return map;
+}
+
+function headerMap_(sheet) { return columnsMap_(sheet, COLUMNS, ["id", "unit", "title", "done"]); }
+function unitMap_(sheet) { return columnsMap_(sheet, UNIT_COLUMNS, ["name"]); }
+function subMap_(sheet) { return columnsMap_(sheet, SUB_COLUMNS, ["id", "taskId", "title", "done"]); }
+
+// Sayfa yoksa oluşturur, başlık satırı boşsa başlıkları yazar.
+function ensureSheet_(name, headers) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) sheet = ss.insertSheet(name);
+  if (!sheet.getRange(1, 1).getValue()) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#0e2a3f").setFontColor("#ffffff");
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function unitsSheet_() { return ensureSheet_(SHEET_UNITS, Object.values(UNIT_COLUMNS)); }
+function subsSheet_() { return ensureSheet_(SHEET_SUBS, Object.values(SUB_COLUMNS)); }
+
+// Dolu son satırın numarası (onay kutusu gibi boş görünen satırlar sayılmaz).
+function lastUsedRow_(values, isEmpty) {
+  let last = 1;
+  values.forEach((r, i) => { if (i > 0 && !isEmpty(r)) last = i + 1; });
+  return last;
+}
+
+function writeFields_(sheet, row, map, obj, skip) {
+  Object.keys(map).forEach((f) => {
+    if (skip && skip.indexOf(f) >= 0) return;
+    sheet.getRange(row, map[f] + 1).setValue(toCell_(f, obj[f]));
+  });
 }
 
 function tasksSheet_() {
@@ -240,15 +298,150 @@ function readAll_() {
     return t;
   });
 
-  let units = [];
-  const us = ss.getSheetByName(SHEET_UNITS);
-  if (us && us.getLastRow() > 1) {
-    const uv = us.getDataRange().getValues();
-    let i = uv[0].map(normalize_).indexOf(normalize_("BirimAdı"));
-    if (i < 0) i = 0;
-    units = uv.slice(1).map((r) => String(r[i] || "").trim()).filter(String);
+  const unitInfo = readUnits_();
+  const units = unitInfo.map((u) => u.name);
+
+  let subs = [];
+  const ssh = ss.getSheetByName(SHEET_SUBS);
+  if (ssh && ssh.getLastRow() > 1) {
+    const sm = subMap_(ssh);
+    subs = ssh.getDataRange().getValues().slice(1)
+      .filter((r) => String(r[sm.id] || "").trim() && String(r[sm.taskId] || "").trim())
+      .map((r) => {
+        const o = {};
+        Object.keys(SUB_COLUMNS).forEach((f) => { o[f] = f in sm ? fromCell_(f, r[sm[f]], tz) : ""; });
+        return o;
+      });
   }
-  return { tasks: tasks, units: units };
+  return { version: API_VERSION, tasks: tasks, units: units, unitInfo: unitInfo, subs: subs };
+}
+
+// ---- Birimler ----------------------------------------------------------------
+
+function readUnits_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_UNITS);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  const map = unitMap_(sheet);
+  return sheet.getDataRange().getValues().slice(1)
+    .map((r) => ({
+      code: "code" in map ? String(r[map.code] || "") : "",
+      name: String(r[map.name] || "").trim(),
+      owner: "owner" in map ? String(r[map.owner] || "") : "",
+      email: "email" in map ? String(r[map.email] || "") : ""
+    }))
+    .filter((u) => u.name);
+}
+
+function findUnitRow_(sheet, map, name) {
+  const values = sheet.getDataRange().getValues();
+  const key = normalize_(name);
+  const i = values.findIndex((r, idx) => idx > 0 && normalize_(r[map.name]) === key);
+  return i < 0 ? -1 : i + 1;
+}
+
+function countTasksOfUnit_(name) {
+  const sheet = tasksSheet_();
+  const map = headerMap_(sheet);
+  return sheet.getDataRange().getValues().slice(1)
+    .filter((r) => !isEmptyRow_(r, map) && String(r[map.unit]) === name).length;
+}
+
+function saveUnit_(oldName, unit) {
+  const name = String((unit && unit.name) || "").trim();
+  if (!name) throw new Error("Birim adı boş olamaz.");
+  const sheet = unitsSheet_();
+  const map = unitMap_(sheet);
+
+  const clash = findUnitRow_(sheet, map, name);
+  const own = oldName ? findUnitRow_(sheet, map, oldName) : -1;
+  if (clash > 0 && clash !== own) throw new Error("\"" + name + "\" adında bir birim zaten var.");
+
+  const saved = { code: "", name: name, owner: String(unit.owner || ""), email: String(unit.email || "") };
+  let renamed = 0;
+
+  if (oldName) {
+    if (own < 0) throw new Error("\"" + oldName + "\" birimi bulunamadı.");
+    if ("code" in map) saved.code = String(sheet.getRange(own, map.code + 1).getValue() || "");
+    writeFields_(sheet, own, map, saved, ["code"]);
+    if (oldName !== name) {
+      // Bu birime bağlı işlerin birim adını da güncelle
+      const ts = tasksSheet_();
+      const tm = headerMap_(ts);
+      const tv = ts.getDataRange().getValues();
+      tv.forEach((r, i) => {
+        if (i > 0 && String(r[tm.unit]) === oldName) { ts.getRange(i + 1, tm.unit + 1).setValue(name); renamed++; }
+      });
+    }
+  } else {
+    const values = sheet.getDataRange().getValues();
+    let max = 0;
+    if ("code" in map) values.slice(1).forEach((r) => {
+      const n = parseInt(String(r[map.code]).replace(/\D/g, ""), 10);
+      if (!isNaN(n) && n > max) max = n;
+    });
+    saved.code = "B" + ("0" + (max + 1)).slice(-2);
+    const row = lastUsedRow_(values, (r) => !String(r[map.name] || "").trim()) + 1;
+    writeFields_(sheet, row, map, saved);
+  }
+  return { unit: saved, renamed: renamed };
+}
+
+function deleteUnit_(name) {
+  const n = countTasksOfUnit_(name);
+  if (n > 0) throw new Error("\"" + name + "\" birimine bağlı " + n + " iş var. Önce bu işleri başka bir birime taşıyın.");
+  const sheet = unitsSheet_();
+  const row = findUnitRow_(sheet, unitMap_(sheet), name);
+  if (row < 0) throw new Error("\"" + name + "\" birimi bulunamadı.");
+  sheet.deleteRow(row);
+  return name;
+}
+
+// ---- Alt paketler ------------------------------------------------------------
+
+function findSubRow_(sheet, map, id) {
+  const ids = sheet.getRange(1, map.id + 1, Math.max(sheet.getLastRow(), 1), 1).getValues();
+  const i = ids.findIndex((r, idx) => idx > 0 && String(r[0]) === String(id));
+  return i < 0 ? -1 : i + 1;
+}
+
+function addSub_(sub) {
+  const title = String((sub && sub.title) || "").trim();
+  if (!title) throw new Error("Alt paket tanımı boş olamaz.");
+  const ts = tasksSheet_();
+  const tm = headerMap_(ts);
+  const taskIds = ts.getRange(1, tm.id + 1, Math.max(ts.getLastRow(), 1), 1).getValues().map((r) => String(r[0]));
+  if (taskIds.indexOf(String(sub.taskId)) < 1) throw new Error(sub.taskId + " numaralı görev bulunamadı.");
+
+  const sheet = subsSheet_();
+  const map = subMap_(sheet);
+  const values = sheet.getDataRange().getValues();
+  let max = 0;
+  values.slice(1).forEach((r) => {
+    if (String(r[map.taskId]) !== String(sub.taskId)) return;
+    const n = parseInt(String(r[map.id]).split(".").pop(), 10);
+    if (!isNaN(n) && n > max) max = n;
+  });
+  const saved = Object.assign({}, sub, { title: title, id: sub.taskId + "." + (max + 1) });
+  const row = lastUsedRow_(values, (r) => !String(r[map.id] || "").trim()) + 1;
+  writeFields_(sheet, row, map, saved);
+  return saved;
+}
+
+function updateSub_(sub) {
+  const sheet = subsSheet_();
+  const map = subMap_(sheet);
+  const row = findSubRow_(sheet, map, sub.id);
+  if (row < 0) throw new Error(sub.id + " numaralı alt paket bulunamadı.");
+  writeFields_(sheet, row, map, sub, ["id", "taskId"]);
+  return sub;
+}
+
+function deleteSub_(id) {
+  const sheet = subsSheet_();
+  const row = findSubRow_(sheet, subMap_(sheet), id);
+  if (row < 0) throw new Error(id + " numaralı alt paket bulunamadı.");
+  sheet.deleteRow(row);
+  return id;
 }
 
 function addTask_(task) {
@@ -265,8 +458,7 @@ function addTask_(task) {
   });
 
   const saved = Object.assign({}, task, { id: ID_PREFIX + ("000" + (max + 1)).slice(-4) });
-  const row = lastUsed + 1;
-  Object.keys(map).forEach((f) => sheet.getRange(row, map[f] + 1).setValue(toCell_(f, saved[f])));
+  writeFields_(sheet, lastUsed + 1, map, saved);
   return saved;
 }
 
@@ -277,8 +469,6 @@ function updateTask_(task) {
   const idx = ids.findIndex((r, i) => i > 0 && String(r[0]) === String(task.id));
   if (idx < 0) throw new Error(task.id + " numaralı görev tabloda bulunamadı.");
   // Yalnızca uygulamanın yönettiği sütunlara yazılır; diğer sütunlar (ör. formüller) korunur.
-  Object.keys(map).forEach((f) => {
-    if (f !== "id") sheet.getRange(idx + 1, map[f] + 1).setValue(toCell_(f, task[f]));
-  });
+  writeFields_(sheet, idx + 1, map, task, ["id"]);
   return task;
 }

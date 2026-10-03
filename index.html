@@ -70,13 +70,20 @@
         </div>
         <button class="btn primary" data-action="settings">Google E-Tablolar'ı bağla</button>
       </div>
+      <div id="updateBanner" class="demo-banner warn" hidden>
+        <div>
+          <b>Google tarafındaki kodu güncelleyin.</b>
+          <span>Birim yönetimi ve alt paketler için E-Tablodaki Apps Script kodunun yeni sürümü gerekiyor.</span>
+        </div>
+        <a class="btn" href="https://github.com/hsynarslan/hsynarslan/blob/main/google-sheets/KURULUM.md#kodu-g%C3%BCncellemek-gerekirse" target="_blank" rel="noopener">Nasıl güncellenir?</a>
+      </div>
       <div class="stats" id="stats"></div>
 
       <div class="insights">
         <div class="panel">
           <div class="panel-head">
             <h2>Birim performansı</h2>
-            <span class="panel-note">Birime tıklayarak listeyi süzün</span>
+            <button id="unitsBtn" class="btn small" hidden>Birimleri yönet</button>
           </div>
           <div id="unitProgress" class="unit-progress"></div>
         </div>
@@ -178,11 +185,56 @@
           <textarea name="note" rows="2"></textarea>
         </label>
       </div>
+      <section id="subsSection" class="subs-edit" hidden>
+        <div class="subs-head">
+          <h3>Alt paketler</h3>
+          <span id="subsCount" class="subs-count"></span>
+        </div>
+        <ul id="subsList" class="sub-list"></ul>
+        <div class="sub-add-row">
+          <input id="subTitle" type="text" placeholder="Yeni alt paket tanımı" aria-label="Yeni alt paket tanımı">
+          <input id="subDue" type="date" aria-label="Alt paket termini">
+          <button type="button" id="subAddBtn" class="btn small">Ekle</button>
+        </div>
+      </section>
       <div class="dialog-actions">
         <button type="button" class="btn ghost" data-action="cancel">Vazgeç</button>
         <button type="submit" class="btn primary">Kaydet</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="unitsDialog">
+    <div class="dlg">
+      <h2>Birimler</h2>
+      <div class="units-wrap">
+        <table class="units-table">
+          <thead><tr><th>Birim</th><th>Sorumlu</th><th>E-posta</th><th class="num">İş</th><th></th></tr></thead>
+          <tbody id="unitsBody"></tbody>
+        </table>
+      </div>
+      <form id="unitForm" class="unit-form">
+        <h3 id="unitFormTitle">Yeni birim ekle</h3>
+        <div class="grid">
+          <label>Birim adı
+            <input id="unitName" type="text" required>
+          </label>
+          <label>Sorumlu
+            <input id="unitOwner" type="text">
+          </label>
+          <label class="full">E-posta
+            <input id="unitEmail" type="email">
+          </label>
+        </div>
+        <p id="unitsError" class="form-error" role="alert" hidden></p>
+        <div class="dialog-actions">
+          <button type="button" class="btn ghost" id="unitCancelEdit" hidden>Düzenlemeyi bırak</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost" data-action="close-units">Kapat</button>
+          <button type="submit" class="btn primary" id="unitSubmit">Birimi ekle</button>
+        </div>
+      </form>
+    </div>
   </dialog>
 
   <dialog id="settingsDialog">
@@ -213,7 +265,7 @@
   </dialog>
 
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" popover="manual"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.30.0/lib/msal-browser.min.js"></script>
   <script src="js/config.js"></script>
