@@ -1,10 +1,19 @@
 # İş Takip
 
-Birimlere atanan işlerin takip edildiği web sayfası. **Veritabanı Office 365'teki bir Excel dosyasıdır**;
-sayfa Microsoft Graph API ile bu dosyayı doğrudan okur ve yazar. Sunucu gerekmez, statik bir sayfadır
-(GitHub Pages, SharePoint, IIS vb. her yerde barındırılabilir).
+Birimlere atanan işlerin takip edildiği web sayfası. Sunucu gerekmez, statik bir sayfadır.
+Veritabanı olarak iki seçenek vardır:
+
+1. **Google E-Tablolar** (önerilen, izin/BT gerektirmez): E-Tabloya eklenen küçük bir Apps Script köprüsü
+   üzerinden okur ve yazar. Kurulum: **[google-sheets/KURULUM.md](google-sheets/KURULUM.md)** (yaklaşık 10 dakika).
+2. **Office 365 Excel**: Microsoft Graph API ile. Entra ID'de uygulama kaydı gerekir (aşağıda).
+
+Hiçbiri bağlı değilse sayfa örnek verilerle **demo modunda** açılır.
 
 ```
+Tarayıcı (index.html) ──fetch + bağlantı anahtarı──► Apps Script web uygulaması ──► Google E-Tablo
+                                                                                    ├─ Görevler
+                                                                                    └─ Birimler
+
 Tarayıcı (index.html)  ──MSAL ile giriş──►  Microsoft Entra ID
         │
         └──Graph API──►  OneDrive / SharePoint  ──►  IsTakip.xlsx
@@ -30,8 +39,8 @@ Tarayıcı (index.html)  ──MSAL ile giriş──►  Microsoft Entra ID
 
 ## Hızlı deneme (demo modu)
 
-`js/config.js` içindeki `clientId` boşsa sayfa **demo modunda** açılır, örnek verilerle çalışır ve
-verileri tarayıcıda tutar:
+Ayarlar'dan Google E-Tablo bağlanmamışsa ve `js/config.js` içindeki `clientId` boşsa sayfa **demo modunda**
+açılır, örnek verilerle çalışır ve verileri tarayıcıda tutar:
 
 ```bash
 python3 -m http.server 8000
@@ -67,7 +76,7 @@ Kurallar:
 
 Şablonu yeniden üretmek için: `pip install openpyxl && python tools/sablon_olustur.py`
 
-## Office 365'e bağlama
+## Office 365'e bağlama (alternatif)
 
 ### 1. Uygulama kaydı (bir kez yapılır)
 
@@ -111,6 +120,8 @@ css/styles.css          Görünüm
 js/config.js            Ayarlar (clientId, Excel linki, tablo adları, seçenekler)
 js/stores.js            Veri katmanı: ExcelStore (Graph API) ve DemoStore
 js/app.js               Arayüz mantığı
+google-sheets/Kod.gs    Google E-Tablolar köprüsü (Apps Script)
+google-sheets/KURULUM.md Google E-Tablolar kurulum rehberi
 sablon/IsTakip.xlsx     Excel şablonu
 tools/sablon_olustur.py Şablonu üreten betik
 ```

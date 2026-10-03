@@ -2,7 +2,7 @@
   "use strict";
 
   const cfg = window.APP_CONFIG;
-  const { Auth, ExcelStore, DemoStore, todayIso } = window.IsTakip;
+  const { Auth, ExcelStore, SheetsStore, DemoStore, todayIso } = window.IsTakip;
   const $ = (sel) => document.querySelector(sel);
 
   const state = {
@@ -593,8 +593,9 @@
     $("#taskForm [data-action=cancel]").addEventListener("click", () => $("#taskDialog").close());
     $("#refreshBtn").addEventListener("click", load);
     $("#settingsBtn").addEventListener("click", openSettings);
-    document.querySelector("[data-action=settings]").addEventListener("click", openSettings);
+    document.querySelectorAll("[data-action=settings]").forEach((b) => b.addEventListener("click", openSettings));
     $("#settingsForm").addEventListener("submit", submitSettings);
+    $("#disconnectBtn").addEventListener("click", disconnect);
     $("#settingsForm [data-action=cancel]").addEventListener("click", () => $("#settingsDialog").close());
 
     const login = () => state.auth.login();
@@ -606,7 +607,7 @@
     bindBoardDnD();
   }
 
-  // ---- Ayarlar (Excel linki yalnızca bu tarayıcıda saklanır) -------------------
+  // ---- Ayarlar (bağlantı bilgileri yalnızca bu tarayıcıda saklanır) ------------
 
   const SETTINGS_KEY = "istakip-ayarlar";
 
@@ -619,24 +620,77 @@
   }
 
   function openSettings() {
+    const saved = readSettings();
+    $("#scriptUrlInput").value = saved.scriptUrl || "";
+    $("#tokenInput").value = saved.token || "";
     $("#shareUrlInput").value = cfg.shareUrl || "";
+    $("#shareUrlRow").hidden = !cfg.clientId;
+    $("#disconnectBtn").hidden = !saved.scriptUrl;
+    settingsError("");
     $("#settingsDialog").showModal();
-    $("#shareUrlInput").focus();
+    (saved.scriptUrl ? $("#tokenInput") : $("#scriptUrlInput")).focus();
+  }
+
+  function settingsError(msg) {
+    const el = $("#settingsError");
+    el.textContent = msg || "";
+    el.hidden = !msg;
   }
 
   async function submitSettings(ev) {
     ev.preventDefault();
-    const url = $("#shareUrlInput").value.trim();
-    if (!/^https:\/\/[^/]+\.(sharepoint\.com|1drv\.ms|onedrive\.live\.com)\//i.test(url)) {
-      toast("Bu bir OneDrive / SharePoint linki gibi görünmüyor. Excel'de Paylaş → Bağlantıyı kopyala ile alınan linki yapıştırın.", true);
+    settingsError("");
+    const scriptUrl = $("#scriptUrlInput").value.trim();
+    const token = $("#tokenInput").value.trim();
+    const shareUrl = $("#shareUrlInput").value.trim();
+    const settings = readSettings();
+
+    if (scriptUrl || token) {
+      if (!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec$/i.test(scriptUrl)) {
+        settingsError("Web uygulaması adresi https://script.google.com/macros/s/…/exec biçiminde olmalı. Apps Script'te Dağıt > Dağıtımları yönet ekranından kopyalayın.");
+        return;
+      }
+      if (!token) { settingsError("Bağlantı anahtarını girin. E-Tabloda İş Takip > Bağlantı anahtarını göster menüsünden alabilirsiniz."); return; }
+      const store = new SheetsStore(scriptUrl, token);
+      const btn = $("#settingsForm [type=submit]");
+      btn.disabled = true;
+      btn.textContent = "Bağlanıyor…";
+      try {
+        await store.load();
+      } catch (e) {
+        settingsError(e.message || String(e));
+        return;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Kaydet ve bağlan";
+      }
+      Object.assign(settings, { scriptUrl, token });
+    } else if (cfg.clientId && shareUrl) {
+      if (!/^https:\/\/[^/]+\.(sharepoint\.com|1drv\.ms|onedrive\.live\.com)\//i.test(shareUrl)) {
+        settingsError("Bu bir OneDrive / SharePoint linki gibi görünmüyor. Excel'de Paylaş > Bağlantıyı kopyala ile alınan linki yapıştırın.");
+        return;
+      }
+      settings.shareUrl = shareUrl;
+    } else {
+      settingsError("Web uygulaması adresini ve bağlantı anahtarını girin.");
       return;
     }
-    cfg.shareUrl = url;
-    if (!writeSettings({ ...readSettings(), shareUrl: url })) {
-      toast("Link bu oturum için kullanılacak, ancak tarayıcı kaydetmeye izin vermedi.", true);
+
+    if (!writeSettings(settings)) {
+      toast("Tarayıcı ayarları kaydetmeye izin vermedi; bağlantı yalnızca bu oturumda geçerli.", true);
     }
     $("#settingsDialog").close();
-    await connectExcel();
+    await start(settings);
+  }
+
+  async function disconnect() {
+    const settings = readSettings();
+    delete settings.scriptUrl;
+    delete settings.token;
+    writeSettings(settings);
+    $("#settingsDialog").close();
+    toast("Google E-Tablolar bağlantısı kaldırıldı");
+    await start(settings);
   }
 
   async function connectExcel() {
@@ -646,9 +700,62 @@
     await load();
   }
 
+  function setBadge(text, cls, title) {
+    const badge = $("#modeBadge");
+    badge.textContent = text;
+    badge.className = "badge " + cls;
+    badge.title = title || "";
+  }
+
   // ---- Başlangıç --------------------------------------------------------------
 
-  async function start() {
+  async function start(saved) {
+    saved = saved || readSettings();
+    $("#settingsBtn").hidden = false;
+    $("#demoBanner").hidden = true;
+
+    // 1) Google E-Tablolar bağlıysa onu kullan
+    if (saved.scriptUrl && saved.token) {
+      state.store = new SheetsStore(saved.scriptUrl, saved.token);
+      setBadge("Google E-Tablolar'a bağlı", "live");
+      await load();
+      return;
+    }
+
+    // 2) Office 365 yapılandırılmışsa Microsoft girişi
+    if (cfg.clientId) {
+      if (saved.shareUrl) cfg.shareUrl = saved.shareUrl;
+      setBadge("Excel'e bağlı", "live");
+      if (typeof msal === "undefined") {
+        show("#signedOut");
+        toast("Microsoft giriş kütüphanesi yüklenemedi. İnternet bağlantınızı kontrol edip sayfayı yenileyin.", true);
+        return;
+      }
+      try {
+        if (!state.auth) { state.auth = new Auth(cfg); await state.auth.init(); }
+      } catch (e) {
+        console.error(e);
+        show("#signedOut");
+        toast("Giriş hatası: " + (e.message || e), true);
+        return;
+      }
+      const account = state.auth.account;
+      $("#loginBtn").hidden = !!account;
+      $("#logoutBtn").hidden = !account;
+      if (!account) { show("#signedOut"); return; }
+      $("#userName").textContent = account.name || account.username;
+      await connectExcel();
+      return;
+    }
+
+    // 3) Hiçbiri yoksa örnek verilerle demo
+    state.store = new DemoStore(cfg);
+    setBadge("Demo modu", "demo", "Ayarlar'dan Google E-Tablonuzu bağlayın");
+    $("#demoBanner").hidden = false;
+    await load();
+  }
+
+  function init() {
     bindEvents();
     try {
       const v = localStorage.getItem("istakip-view");
@@ -657,48 +764,8 @@
         document.querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("active", b.dataset.view === v));
       }
     } catch (_) {}
-
-    const demo = !cfg.clientId;
-    const badge = $("#modeBadge");
-
-    if (demo) {
-      state.store = new DemoStore(cfg);
-      badge.textContent = "Demo modu";
-      badge.className = "badge demo";
-      badge.title = "config.js içinde clientId tanımlanınca Excel'e bağlanır";
-      await load();
-      return;
-    }
-
-    const saved = readSettings();
-    if (saved.shareUrl) cfg.shareUrl = saved.shareUrl;
-
-    badge.textContent = "Excel'e bağlı";
-    badge.className = "badge live";
-    if (typeof msal === "undefined") {
-      show("#signedOut");
-      toast("Microsoft giriş kütüphanesi yüklenemedi. İnternet bağlantınızı kontrol edip sayfayı yenileyin.", true);
-      return;
-    }
-    try {
-      state.auth = new Auth(cfg);
-      await state.auth.init();
-    } catch (e) {
-      console.error(e);
-      show("#signedOut");
-      toast("Giriş hatası: " + (e.message || e), true);
-      return;
-    }
-
-    const account = state.auth.account;
-    $("#loginBtn").hidden = !!account;
-    $("#logoutBtn").hidden = !account;
-    if (!account) { show("#signedOut"); return; }
-
-    $("#userName").textContent = account.name || account.username;
-    $("#settingsBtn").hidden = false;
-    await connectExcel();
+    start();
   }
 
-  start();
+  init();
 })();

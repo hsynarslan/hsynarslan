@@ -448,8 +448,20 @@ dialog .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 dialog label { display: grid; gap: 5px; font-size: 12px; font-weight: 600; color: var(--muted); }
 dialog label.full { grid-column: 1 / -1; }
 dialog textarea { resize: vertical; }
+.settings-fields { display: grid; gap: 14px; margin-top: 16px; }
+.settings-fields label { display: grid; gap: 5px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.form-help a { color: var(--primary); }
+.dialog-actions .spacer { flex: 1; }
+.btn.danger { color: var(--critical-text); }
+.demo-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--primary); border-radius: var(--radius);
+  padding: 14px 18px; margin-bottom: 16px; box-shadow: var(--shadow);
+}
+.demo-banner div { display: grid; gap: 2px; min-width: 0; }
+.demo-banner span { color: var(--muted); font-size: 13px; }
+.form-error { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--critical-bg); color: var(--critical-text); font-size: 13px; font-weight: 600; }
 .form-help { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
-#settingsForm label { display: grid; gap: 5px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 
 .tooltip {

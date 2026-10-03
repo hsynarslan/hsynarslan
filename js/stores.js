@@ -254,6 +254,59 @@
     }
   }
 
+  // ---- Google E-Tablolar deposu (Apps Script web uygulaması) -------------------
+
+  class SheetsStore {
+    constructor(url, token) { this.url = url; this.token = token; }
+
+    get label() { return "Google E-Tablolar"; }
+
+    async request(init, query) {
+      let res;
+      try {
+        res = await fetch(this.url + (query || ""), { redirect: "follow", ...init });
+      } catch (_) {
+        throw new Error("Google'a ulaşılamadı. Web uygulaması adresini ve dağıtımdaki \"Erişimi olanlar: Herkes\" ayarını kontrol edin.");
+      }
+      let data;
+      try {
+        data = await res.json();
+      } catch (_) {
+        throw new Error("Google'dan beklenmeyen yanıt geldi. Dağıtımda \"Erişimi olanlar: Herkes\" seçili olmalı ve adres /exec ile bitmeli.");
+      }
+      if (!data.ok) throw new Error(data.error || "Google E-Tablolar isteği başarısız oldu.");
+      return data;
+    }
+
+    async load() {
+      const data = await this.request({ method: "GET" }, "?action=load&token=" + encodeURIComponent(this.token));
+      const tasks = data.tasks || [];
+      let units = data.units || [];
+      if (!units.length) units = [...new Set(tasks.map((t) => t.unit).filter(Boolean))];
+      return { tasks, units };
+    }
+
+    // text/plain gövde, tarayıcının ön kontrol (CORS preflight) isteği atmasını engeller;
+    // Apps Script bu isteği kabul etmez.
+    post(body) {
+      return this.request({
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ token: this.token, ...body })
+      });
+    }
+
+    async addTask(task) {
+      const data = await this.post({ action: "add", task });
+      return data.task;
+    }
+
+    async updateTask(task) {
+      await this.post({ action: "update", task });
+      return task;
+    }
+  }
+
   // ---- Demo deposu (localStorage) -------------------------------------------
 
   const DEMO_KEY = "istakip-demo-v2";
@@ -336,5 +389,5 @@
     }
   }
 
-  window.IsTakip = { Auth, ExcelStore, DemoStore, todayIso, TASK_COLUMNS };
+  window.IsTakip = { Auth, ExcelStore, SheetsStore, DemoStore, todayIso, TASK_COLUMNS };
 })();
