@@ -82,12 +82,13 @@ Kurallar:
 
 ```js
 clientId: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-tenantId: "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy",
-shareUrl: "https://kurum.sharepoint.com/:x:/g/personal/.../EAbc...?e=XyZ",
+tenantId: "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy",   // ya da kurum.onmicrosoft.com
 ```
 
-`shareUrl`, Excel'de **Paylaş → Bağlantıyı kopyala** ile alınan linktir. Dosya kendi OneDrive'ınızdaysa
-link yerine `filePath: "Belgeler/IsTakip.xlsx"` de yazabilirsiniz.
+Excel linki `config.js`'e yazılmaz: sayfaya ilk girişte **Ayarlar** penceresi açılır, Excel'de
+**Paylaş → Bağlantıyı kopyala** ile alınan link oraya yapıştırılır. Link yalnızca o tarayıcıda saklanır;
+böylece herkese açık repoda kişisel dosya adresi yer almaz. (İsterseniz `shareUrl` veya `filePath`
+alanlarını yine de doldurabilirsiniz.)
 
 ### 3. Yayınlayın
 

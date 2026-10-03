@@ -29,6 +29,10 @@
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Yenile
           </button>
+          <button id="settingsBtn" class="btn on-hero" hidden title="Excel bağlantısı">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            Ayarlar
+          </button>
           <button id="loginBtn" class="btn on-hero" hidden>Microsoft ile giriş</button>
           <button id="logoutBtn" class="btn on-hero" hidden>Çıkış</button>
         </div>
@@ -50,6 +54,12 @@
       <h2>Giriş yapın</h2>
       <p>Excel dosyasına erişmek için Microsoft 365 hesabınızla giriş yapın.</p>
       <button class="btn primary" data-action="login">Microsoft ile giriş</button>
+    </section>
+
+    <section id="noFile" class="empty-state" hidden>
+      <h2>Excel dosyasını bağlayın</h2>
+      <p>İş takip dosyanızın paylaşım linkini bir kez girmeniz yeterli. Link yalnızca bu tarayıcıda saklanır.</p>
+      <button class="btn primary" data-action="settings">Excel linkini gir</button>
     </section>
 
     <section id="appView" hidden>
@@ -164,6 +174,22 @@
       <div class="dialog-actions">
         <button type="button" class="btn ghost" data-action="cancel">Vazgeç</button>
         <button type="submit" class="btn primary">Kaydet</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog">
+    <form id="settingsForm" method="dialog">
+      <h2>Excel bağlantısı</h2>
+      <label class="full">Excel dosyasının paylaşım linki
+        <input id="shareUrlInput" name="shareUrl" type="url" required
+          placeholder="https://…sharepoint.com/:x:/g/personal/…">
+      </label>
+      <p class="form-help">Excel'i Office 365'te açın, <b>Paylaş → Bağlantıyı kopyala</b> ile linki alıp buraya yapıştırın.
+        Link bu tarayıcıda saklanır, sunucuya ya da GitHub'a gönderilmez.</p>
+      <div class="dialog-actions">
+        <button type="button" class="btn ghost" data-action="cancel">Vazgeç</button>
+        <button type="submit" class="btn primary">Kaydet ve bağlan</button>
       </div>
     </form>
   </dialog>

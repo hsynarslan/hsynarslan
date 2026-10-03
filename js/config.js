@@ -4,13 +4,15 @@ window.APP_CONFIG = {
   // Azure Portal > Microsoft Entra ID > Uygulama kayıtları > "Uygulama (istemci) kimliği"
   clientId: "",
 
-  // Kiracı (tenant) kimliği ya da "organizations" (iş/okul hesapları için)
-  tenantId: "organizations",
+  // Kiracı (tenant): Azure'daki "Dizin (kiracı) kimliği" ya da kurumun onmicrosoft.com alan adı
+  tenantId: "stuyasaredu.onmicrosoft.com",
 
   // Boş bırakılırsa sayfanın kendi adresi kullanılır. Azure'daki "Yeniden yönlendirme URI" ile aynı olmalı.
   redirectUri: "",
 
-  // Excel dosyasının paylaşım linki (OneDrive / SharePoint > Paylaş > Bağlantıyı kopyala)
+  // Excel dosyasının paylaşım linki (OneDrive / SharePoint > Paylaş > Bağlantıyı kopyala).
+  // Boş bırakılabilir: sayfadaki "Ayarlar" penceresinden girilen link tarayıcıda saklanır
+  // ve buradaki değerin yerine geçer. Herkese açık bir repoda linki buraya yazmayın.
   shareUrl: "",
 
   // Paylaşım linki yerine kendi OneDrive'ınızdaki yol da verilebilir, ör. "Belgeler/IsTakip.xlsx"

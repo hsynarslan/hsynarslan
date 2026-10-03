@@ -116,7 +116,7 @@
   }
 
   function show(id) {
-    for (const s of ["#signedOut", "#appView", "#loading"]) $(s).hidden = s !== id;
+    for (const s of ["#signedOut", "#noFile", "#appView", "#loading"]) $(s).hidden = s !== id;
     $("#heroBody").hidden = id !== "#appView";
   }
 
@@ -592,6 +592,10 @@
     $("#taskForm").addEventListener("submit", submitDialog);
     $("#taskForm [data-action=cancel]").addEventListener("click", () => $("#taskDialog").close());
     $("#refreshBtn").addEventListener("click", load);
+    $("#settingsBtn").addEventListener("click", openSettings);
+    document.querySelector("[data-action=settings]").addEventListener("click", openSettings);
+    $("#settingsForm").addEventListener("submit", submitSettings);
+    $("#settingsForm [data-action=cancel]").addEventListener("click", () => $("#settingsDialog").close());
 
     const login = () => state.auth.login();
     $("#loginBtn").addEventListener("click", login);
@@ -600,6 +604,46 @@
 
     bindTooltip();
     bindBoardDnD();
+  }
+
+  // ---- Ayarlar (Excel linki yalnızca bu tarayıcıda saklanır) -------------------
+
+  const SETTINGS_KEY = "istakip-ayarlar";
+
+  function readSettings() {
+    try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch (_) { return {}; }
+  }
+
+  function writeSettings(settings) {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); return true; } catch (_) { return false; }
+  }
+
+  function openSettings() {
+    $("#shareUrlInput").value = cfg.shareUrl || "";
+    $("#settingsDialog").showModal();
+    $("#shareUrlInput").focus();
+  }
+
+  async function submitSettings(ev) {
+    ev.preventDefault();
+    const url = $("#shareUrlInput").value.trim();
+    if (!/^https:\/\/[^/]+\.(sharepoint\.com|1drv\.ms|onedrive\.live\.com)\//i.test(url)) {
+      toast("Bu bir OneDrive / SharePoint linki gibi görünmüyor. Excel'de Paylaş → Bağlantıyı kopyala ile alınan linki yapıştırın.", true);
+      return;
+    }
+    cfg.shareUrl = url;
+    if (!writeSettings({ ...readSettings(), shareUrl: url })) {
+      toast("Link bu oturum için kullanılacak, ancak tarayıcı kaydetmeye izin vermedi.", true);
+    }
+    $("#settingsDialog").close();
+    await connectExcel();
+  }
+
+  async function connectExcel() {
+    if (!state.auth || !state.auth.account) return;
+    if (!cfg.shareUrl && !cfg.filePath) { show("#noFile"); return; }
+    state.store = new ExcelStore(cfg, state.auth);
+    await load();
   }
 
   // ---- Başlangıç --------------------------------------------------------------
@@ -626,6 +670,9 @@
       return;
     }
 
+    const saved = readSettings();
+    if (saved.shareUrl) cfg.shareUrl = saved.shareUrl;
+
     badge.textContent = "Excel'e bağlı";
     badge.className = "badge live";
     if (typeof msal === "undefined") {
@@ -649,8 +696,8 @@
     if (!account) { show("#signedOut"); return; }
 
     $("#userName").textContent = account.name || account.username;
-    state.store = new ExcelStore(cfg, state.auth);
-    await load();
+    $("#settingsBtn").hidden = false;
+    await connectExcel();
   }
 
   start();

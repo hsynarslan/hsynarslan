@@ -157,7 +157,7 @@
         const p = this.cfg.filePath.split("/").map(encodeURIComponent).join("/");
         this.base = `/me/drive/root:/${p}:/workbook`;
       } else {
-        throw new Error("config.js içinde shareUrl veya filePath tanımlanmalı.");
+        throw new Error("Excel bağlantısı girilmedi. Ayarlar düğmesinden Excel linkini girin.");
       }
       return this.base;
     }
