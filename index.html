@@ -33,6 +33,10 @@
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
             Ayarlar
           </button>
+          <button id="lockBtn" class="btn on-hero" hidden title="Sayfayı kilitle">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Kilitle
+          </button>
           <button id="loginBtn" class="btn on-hero" hidden>Microsoft ile giriş</button>
           <button id="logoutBtn" class="btn on-hero" hidden>Çıkış</button>
         </div>
@@ -50,6 +54,40 @@
   </header>
 
   <main>
+    <section id="lockView" class="lock" hidden>
+      <div class="lock-card">
+        <span class="lock-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="26" height="26"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </span>
+        <h2 id="lockTitle">İş Takip kilitli</h2>
+        <p id="lockText" class="lock-text"></p>
+        <form id="lockForm">
+          <input type="text" class="sr-only" autocomplete="username" value="İş Takip" tabindex="-1" aria-hidden="true">
+          <div class="settings-fields">
+            <label data-mode="setup">Web uygulaması adresi
+              <input id="lockUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+            </label>
+            <label data-mode="setup">Bağlantı anahtarı
+              <input id="lockToken" type="password" placeholder="E-Tablodaki İş Takip menüsünden alın" autocomplete="off">
+            </label>
+            <label><span id="lockPwLabel">Şifre</span>
+              <input id="lockPw" type="password" autocomplete="current-password">
+            </label>
+            <label data-mode="setup migrate">Şifre (tekrar)
+              <input id="lockPw2" type="password" autocomplete="new-password">
+            </label>
+          </div>
+          <p id="lockError" class="form-error" role="alert" hidden></p>
+          <button type="submit" class="btn primary block" id="lockSubmit">Kilidi aç</button>
+        </form>
+        <div class="lock-links">
+          <button type="button" class="linklike" id="forgotBtn" data-mode="unlock">Şifremi unuttum</button>
+          <a data-mode="setup" href="https://github.com/hsynarslan/hsynarslan/blob/main/google-sheets/KURULUM.md" target="_blank" rel="noopener">Kurulum rehberi</a>
+          <button type="button" class="linklike" id="demoBtn" data-mode="setup">Örnek verilerle dene</button>
+        </div>
+      </div>
+    </section>
+
     <section id="signedOut" class="empty-state" hidden>
       <h2>Giriş yapın</h2>
       <p>Excel dosyasına erişmek için Microsoft 365 hesabınızla giriş yapın.</p>
@@ -240,23 +278,30 @@
   <dialog id="settingsDialog">
     <form id="settingsForm" method="dialog">
       <h2>Bağlantı ayarları</h2>
-      <p class="form-help">Kendi Google E-Tablonuzu bağlayın. Kurulum adımları için
-        <a href="https://github.com/hsynarslan/hsynarslan/blob/main/google-sheets/KURULUM.md" target="_blank" rel="noopener">kurulum rehberine</a> bakın.
-        Bilgiler yalnızca bu tarayıcıda saklanır.</p>
+      <p class="form-help">Google E-Tablo bağlantınızı ya da şifrenizi değiştirin. Değişiklik için mevcut şifreniz gerekir.
+        Bilgiler yalnızca bu tarayıcıda, şifrenizle kilitlenmiş olarak saklanır.</p>
       <div class="settings-fields">
+        <div id="googleFields" class="settings-fields" hidden>
         <label>Web uygulaması adresi
           <input id="scriptUrlInput" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
         </label>
         <label>Bağlantı anahtarı
           <input id="tokenInput" type="password" placeholder="E-Tablodaki İş Takip menüsünden alın" autocomplete="off">
         </label>
+        <label>Mevcut şifre
+          <input id="currentPwInput" type="password" autocomplete="current-password">
+        </label>
+        <label>Yeni şifre <span class="opt">(değiştirmeyecekseniz boş bırakın)</span>
+          <input id="newPwInput" type="password" autocomplete="new-password">
+        </label>
+        </div>
         <label id="shareUrlRow" hidden>Excel paylaşım linki (Office 365)
           <input id="shareUrlInput" type="url" placeholder="https://…sharepoint.com/:x:/g/personal/…">
         </label>
       </div>
       <p id="settingsError" class="form-error" role="alert" hidden></p>
       <div class="dialog-actions">
-        <button type="button" class="btn ghost danger" id="disconnectBtn" hidden>Bağlantıyı kaldır</button>
+        <button type="button" class="btn ghost danger" id="disconnectBtn" hidden>Bu cihazdan kaldır</button>
         <span class="spacer"></span>
         <button type="button" class="btn ghost" data-action="cancel">Vazgeç</button>
         <button type="submit" class="btn primary">Kaydet ve bağlan</button>

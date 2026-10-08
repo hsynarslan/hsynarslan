@@ -58,19 +58,26 @@ web sayfasındaki **Birimleri yönet** düğmesinden kendi birimlerinizle deği�
 > "Herkes" ayarı, sayfanın sizden Google girişi istemeden tabloya ulaşabilmesi içindir. Tabloya erişim için adresin
 > yanında **bağlantı anahtarı** da gerekir. Anahtarı ve adresi kimseyle paylaşmayın.
 
-## 5. Sayfayı bağlayın (1 dk)
+## 5. Sayfayı bağlayın ve şifre belirleyin (1 dk)
 
-1. https://hsynarslan.github.io/hsynarslan/ adresini açın.
-2. **Google E-Tablolar'ı bağla** düğmesine (ya da sağ üstteki **Ayarlar** düğmesine) tıklayın.
-3. **Web uygulaması adresi** alanına 4. adımda kopyaladığınız adresi yapıştırın.
-4. **Bağlantı anahtarı** alanına 3. adımdaki anahtarı yapıştırın.
-5. **Kaydet ve bağlan** düğmesine basın.
+1. https://hsynarslan.github.io/hsynarslan/ adresini açın. **"İş Takip'i bağlayın"** ekranı gelir.
+2. **Web uygulaması adresi** alanına 4. adımda kopyaladığınız adresi yapıştırın.
+3. **Bağlantı anahtarı** alanına 3. adımdaki anahtarı yapıştırın.
+4. **Yeni şifre** ve **Şifre (tekrar)** alanlarına bu cihazda kullanacağınız bir şifre yazın (en az 6 karakter).
+5. **Bağlan ve kilitle** düğmesine basın.
 
 ✅ **Kontrol:** Sağ üstte **"Google E-Tablolar'a bağlı"** yazıyor. **Yeni görev** ile bir iş ekleyin;
 birkaç saniye içinde E-Tablonun **Görevler** sayfasında görünür.
 
-Bağlantı bilgileri yalnızca o tarayıcıda saklanır. Telefonda ya da başka bir bilgisayarda kullanmak için orada da
-5. adımı bir kez tekrarlayın.
+### Şifre nasıl çalışır?
+
+- Adres ve anahtar bu tarayıcıda **şifrenizle şifrelenmiş** olarak saklanır; şifrenin kendisi hiçbir yerde tutulmaz.
+- Sayfa her yeni açılışta şifre sorar. Sekmeyi kapatınca, **Kilitle** düğmesine basınca ya da **30 dakika** işlem
+  yapılmayınca kendiliğinden kilitlenir.
+- Şifreyi değiştirmek için: **Ayarlar** → mevcut şifre + yeni şifre → **Kaydet ve bağlan**.
+- **Şifremi unuttum** derseniz yalnızca bu cihazdaki kayıt silinir; E-Tablodaki verileriniz durur. Adres ve anahtarla
+  (E-Tabloda **İş Takip → 2. Bağlantı anahtarını göster**) yeniden bağlanıp yeni şifre belirlersiniz.
+- Telefonda ya da başka bir bilgisayarda kullanmak için orada da 5. adımı bir kez yapın. Her cihazın şifresi ayrıdır.
 
 ---
 

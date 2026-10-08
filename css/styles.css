@@ -530,6 +530,29 @@ dialog textarea { resize: vertical; }
   .dlg { padding: 18px; }
 }
 
+/* Kilit ekranı */
+.lock { display: grid; place-items: center; padding-block: 8px 40px; }
+.lock-card {
+  width: min(440px, 100%); background: var(--surface); border: 1px solid var(--border);
+  border-radius: 18px; box-shadow: var(--shadow); padding: 28px; display: grid; gap: 6px;
+}
+.lock-icon {
+  width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center;
+  background: var(--progress-bg); color: var(--primary); margin-bottom: 6px;
+}
+.lock-card h2 { font-size: 20px; }
+.lock-text { margin: 0; color: var(--muted); }
+.lock-card form { display: grid; gap: 4px; margin-top: 10px; }
+.lock-card input { color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; font-size: 15px; }
+.btn.block { width: 100%; justify-content: center; margin-top: 14px; padding-block: 11px; }
+.lock-links { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 12px; font-size: 13px; }
+.lock-links a, .linklike { color: var(--primary); }
+.linklike { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.linklike.confirm { color: var(--critical-text); font-weight: 700; }
+label > input, label > select, label > textarea { font-weight: 500; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; padding: 0; margin: -1px; }
+.opt { font-weight: 400; }
+
 .form-error { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--critical-bg); color: var(--critical-text); font-size: 13px; font-weight: 600; }
 .form-help { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }

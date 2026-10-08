@@ -162,7 +162,7 @@
   }
 
   function show(id) {
-    for (const s of ["#signedOut", "#noFile", "#appView", "#loading"]) $(s).hidden = s !== id;
+    for (const s of ["#lockView", "#signedOut", "#noFile", "#appView", "#loading"]) $(s).hidden = s !== id;
     $("#heroBody").hidden = id !== "#appView";
   }
 
@@ -936,29 +936,262 @@
     bindBoardDnD();
   }
 
-  // ---- Ayarlar (bağlantı bilgileri yalnızca bu tarayıcıda saklanır) ------------
+  // ---- Şifreli kasa ---------------------------------------------------------------
+  // Google bağlantı bilgileri (adres + anahtar) bu tarayıcıda kullanıcının şifresiyle
+  // şifrelenmiş olarak saklanır: PBKDF2 (SHA-256) ile anahtar türetilir, AES-GCM ile şifrelenir.
+  // Şifrenin kendisi hiçbir yerde saklanmaz. Kilit açıkken bilgiler yalnızca bu sekmenin
+  // oturum belleğinde tutulur; sekme kapanınca ya da 30 dakika işlem yapılmayınca silinir.
 
   const SETTINGS_KEY = "istakip-ayarlar";
+  const VAULT_KEY = "istakip-kasa";
+  const SESSION_KEY = "istakip-oturum";
+  const DEMO_KEY = "istakip-demo";
+  const IDLE_MS = 30 * 60 * 1000;
+  const PBKDF2_ITERATIONS = 310000;
+  const MIN_PW = 6;
 
-  function readSettings() {
-    try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch (_) { return {}; }
+  const toB64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const fromB64 = (str) => Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
+
+  async function deriveKey(password, salt, iterations) {
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+      base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
   }
 
-  function writeSettings(settings) {
-    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); return true; } catch (_) { return false; }
+  async function sealVault(secret, password) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(password, salt, PBKDF2_ITERATIONS);
+    const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(JSON.stringify(secret)));
+    return { v: 1, iter: PBKDF2_ITERATIONS, salt: toB64(salt), iv: toB64(iv), data: toB64(data) };
   }
 
-  function openSettings() {
-    const saved = readSettings();
-    $("#scriptUrlInput").value = saved.scriptUrl || "";
-    $("#tokenInput").value = saved.token || "";
-    $("#shareUrlInput").value = cfg.shareUrl || "";
-    $("#shareUrlRow").hidden = !cfg.clientId;
-    $("#disconnectBtn").hidden = !saved.scriptUrl;
-    settingsError("");
-    $("#settingsDialog").showModal();
-    (saved.scriptUrl ? $("#tokenInput") : $("#scriptUrlInput")).focus();
+  async function openVault(vault, password) {
+    try {
+      const key = await deriveKey(password, fromB64(vault.salt), vault.iter || PBKDF2_ITERATIONS);
+      const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(vault.iv) }, key, fromB64(vault.data));
+      return JSON.parse(new TextDecoder().decode(plain));
+    } catch (_) {
+      throw new Error("Şifre hatalı.");
+    }
   }
+
+  function readJson(storage, key) {
+    try { return JSON.parse(storage.getItem(key)); } catch (_) { return null; }
+  }
+
+  function writeJson(storage, key, value) {
+    try { storage.setItem(key, JSON.stringify(value)); return true; } catch (_) { return false; }
+  }
+
+  function removeKey(storage, key) {
+    try { storage.removeItem(key); } catch (_) {}
+  }
+
+  function readSettings() { return readJson(localStorage, SETTINGS_KEY) || {}; }
+  function writeSettings(settings) { return writeJson(localStorage, SETTINGS_KEY, settings); }
+
+  function readVault() {
+    const v = readJson(localStorage, VAULT_KEY);
+    return v && v.data && v.salt && v.iv ? v : null;
+  }
+
+  function readSession() {
+    const s = readJson(sessionStorage, SESSION_KEY);
+    if (!s || !s.scriptUrl || !s.token) return null;
+    if (Date.now() - (s.at || 0) > IDLE_MS) { removeKey(sessionStorage, SESSION_KEY); return null; }
+    return s;
+  }
+
+  function writeSession(secret) {
+    writeJson(sessionStorage, SESSION_KEY, { scriptUrl: secret.scriptUrl, token: secret.token, at: Date.now() });
+  }
+
+  let lastTouch = 0;
+  function touchSession() {
+    if (Date.now() - lastTouch < 30000) return;
+    lastTouch = Date.now();
+    const s = readSession();
+    if (s) writeSession(s);
+  }
+
+  function isDemo() {
+    try { return sessionStorage.getItem(DEMO_KEY) === "1"; } catch (_) { return false; }
+  }
+
+  function setDemo(on) {
+    try { if (on) sessionStorage.setItem(DEMO_KEY, "1"); else sessionStorage.removeItem(DEMO_KEY); } catch (_) {}
+  }
+
+  function validUrl(url) { return /^https:\/\/script\.google(usercontent)?\.com\/.+\/exec$/i.test(url); }
+  const URL_HELP = "Web uygulaması adresi https://script.google.com/macros/s/…/exec biçiminde olmalı. Apps Script'te Dağıt > Dağıtımları yönet ekranından kopyalayın.";
+
+  function checkNewPassword(pw, pw2) {
+    if (pw.length < MIN_PW) return `Şifre en az ${MIN_PW} karakter olmalı.`;
+    if (pw2 !== undefined && pw !== pw2) return "Şifreler birbiriyle aynı değil.";
+    return "";
+  }
+
+  // ---- Üst çubuk ve rozet ------------------------------------------------------------
+
+  function setBadge(text, cls, title) {
+    const badge = $("#modeBadge");
+    badge.textContent = text;
+    badge.className = "badge " + cls;
+    badge.title = title || "";
+  }
+
+  function setChrome({ refresh = false, settings = false, lock = false } = {}) {
+    $("#refreshBtn").hidden = !refresh;
+    $("#settingsBtn").hidden = !settings;
+    $("#lockBtn").hidden = !lock;
+  }
+
+  // ---- Kilit ekranı ------------------------------------------------------------------
+
+  const LOCK_TEXT = {
+    unlock: ["İş Takip kilitli", "Devam etmek için şifrenizi girin.", "Kilidi aç", "Şifre"],
+    setup: ["İş Takip'i bağlayın",
+      "Google E-Tablonuzun web uygulaması adresini ve bağlantı anahtarını girin, bu cihaz için bir şifre belirleyin. Bilgiler bu tarayıcıda şifrenizle kilitlenmiş olarak saklanır.",
+      "Bağlan ve kilitle", "Yeni şifre"],
+    migrate: ["Bir şifre belirleyin",
+      "Bağlantı bilgileriniz artık şifreyle korunuyor. Bu cihazda kullanacağınız bir şifre belirleyin; sayfa her açılışta bu şifreyi soracak.",
+      "Şifreyi kaydet", "Yeni şifre"]
+  };
+
+  function lockError(msg) {
+    const el = $("#lockError");
+    el.textContent = msg || "";
+    el.hidden = !msg;
+  }
+
+  function showLock(mode, message) {
+    state.lockMode = mode;
+    state.store = null;
+    state.tasks = [];
+    state.subs = [];
+    state.units = [];
+    state.unitInfo = [];
+    document.querySelectorAll("dialog[open]").forEach((d) => d.close());
+    // Kilitliyken önceki verilerin hiçbiri sayfada kalmasın
+    for (const id of ["#taskBody", "#boardView", "#upcoming", "#unitProgress", "#stats", "#statusChart",
+      "#heroSummary", "#heroRing", "#unitsBody", "#subsList"]) $(id).innerHTML = "";
+    const [title, text, submit, pwLabel] = LOCK_TEXT[mode];
+    $("#lockTitle").textContent = title;
+    $("#lockText").textContent = text;
+    $("#lockSubmit").textContent = submit;
+    $("#lockPwLabel").textContent = pwLabel;
+    $("#lockPw").autocomplete = mode === "unlock" ? "current-password" : "new-password";
+    document.querySelectorAll("#lockView [data-mode]").forEach((el) => {
+      el.hidden = !el.dataset.mode.split(" ").includes(mode);
+    });
+    for (const id of ["#lockUrl", "#lockToken", "#lockPw", "#lockPw2"]) $(id).value = "";
+    const forgot = $("#forgotBtn");
+    forgot.classList.remove("confirm");
+    forgot.textContent = "Şifremi unuttum";
+    lockError(message || "");
+    setBadge(mode === "unlock" ? "Kilitli" : "Bağlı değil", "demo");
+    setChrome();
+    $("#userName").textContent = "";
+    show("#lockView");
+    (mode === "setup" ? $("#lockUrl") : $("#lockPw")).focus();
+  }
+
+  async function submitLock(ev) {
+    ev.preventDefault();
+    lockError("");
+    const mode = state.lockMode;
+    const pw = $("#lockPw").value;
+    const btn = $("#lockSubmit");
+    const label = btn.textContent;
+    let secret;
+
+    if (mode === "unlock") {
+      if (!pw) { lockError("Şifrenizi girin."); return; }
+    } else {
+      const err = checkNewPassword(pw, $("#lockPw2").value);
+      if (err) { lockError(err); return; }
+    }
+    if (mode === "setup") {
+      secret = { scriptUrl: $("#lockUrl").value.trim(), token: $("#lockToken").value.trim() };
+      if (!validUrl(secret.scriptUrl)) { lockError(URL_HELP); return; }
+      if (!secret.token) { lockError("Bağlantı anahtarını girin. E-Tabloda İş Takip > Bağlantı anahtarını göster menüsünden alabilirsiniz."); return; }
+    }
+
+    btn.disabled = true;
+    btn.textContent = mode === "unlock" ? "Açılıyor…" : "Kaydediliyor…";
+    try {
+      if (mode === "unlock") {
+        secret = await openVault(readVault(), pw);
+      } else {
+        if (mode === "migrate") {
+          const plain = readSettings();
+          secret = { scriptUrl: plain.scriptUrl, token: plain.token };
+        } else {
+          await new SheetsStore(secret.scriptUrl, secret.token).load(); // bağlantıyı dene
+        }
+        if (!writeJson(localStorage, VAULT_KEY, await sealVault(secret, pw))) {
+          throw new Error("Tarayıcı bu sayfanın veri saklamasına izin vermiyor (gizli pencere olabilir).");
+        }
+        const plain = readSettings();
+        delete plain.scriptUrl;
+        delete plain.token;
+        writeSettings(plain);
+      }
+    } catch (e) {
+      lockError(e.message || String(e));
+      $("#lockPw").select();
+      return;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+    writeSession(secret);
+    setDemo(false);
+    await connectSheets(secret);
+    if (mode !== "unlock") toast("Şifre kaydedildi. Sayfa her açılışta bu şifreyi soracak.");
+  }
+
+  function forgotPassword() {
+    const btn = $("#forgotBtn");
+    if (!btn.classList.contains("confirm")) {
+      btn.classList.add("confirm");
+      btn.textContent = "Bu cihazdaki bağlantı silinsin mi? Onaylamak için tekrar tıklayın";
+      return;
+    }
+    removeKey(localStorage, VAULT_KEY);
+    removeKey(sessionStorage, SESSION_KEY);
+    showLock("setup", "");
+    toast("Bağlantı bu cihazdan silindi. E-Tablodaki verileriniz duruyor; adres ve anahtarla yeniden bağlanın.");
+  }
+
+  function lockNow(message) {
+    removeKey(sessionStorage, SESSION_KEY);
+    showLock(readVault() ? "unlock" : "setup", message);
+  }
+
+  function startIdleWatch() {
+    for (const ev of ["pointerdown", "keydown", "scroll"]) {
+      document.addEventListener(ev, touchSession, { passive: true, capture: true });
+    }
+    setInterval(() => {
+      if (state.store instanceof SheetsStore && !readSession()) {
+        lockNow("30 dakika işlem yapılmadığı için sayfa kilitlendi.");
+      }
+    }, 60000);
+  }
+
+  async function connectSheets(secret) {
+    state.store = new SheetsStore(secret.scriptUrl, secret.token);
+    setBadge("Google E-Tablolar'a bağlı", "live");
+    setChrome({ refresh: true, settings: true, lock: true });
+    $("#demoBanner").hidden = true;
+    await load();
+  }
+
+  // ---- Ayarlar penceresi -------------------------------------------------------------
 
   function settingsError(msg) {
     const el = $("#settingsError");
@@ -966,26 +1199,46 @@
     el.hidden = !msg;
   }
 
+  function openSettings() {
+    const session = readSession();
+    // Google bağlı değilse (demo vb.) kurulum ekranına git
+    if (!session && !cfg.clientId) {
+      setDemo(false);
+      showLock(readVault() ? "unlock" : "setup");
+      return;
+    }
+    $("#googleFields").hidden = !session;
+    $("#scriptUrlInput").value = session ? session.scriptUrl : "";
+    $("#tokenInput").value = session ? session.token : "";
+    $("#currentPwInput").value = "";
+    $("#newPwInput").value = "";
+    $("#shareUrlInput").value = cfg.shareUrl || "";
+    $("#shareUrlRow").hidden = !cfg.clientId || !!session;
+    $("#disconnectBtn").hidden = !session;
+    settingsError("");
+    $("#settingsDialog").showModal();
+    (session ? $("#currentPwInput") : $("#shareUrlInput")).focus();
+  }
+
   async function submitSettings(ev) {
     ev.preventDefault();
     settingsError("");
-    const scriptUrl = $("#scriptUrlInput").value.trim();
-    const token = $("#tokenInput").value.trim();
-    const shareUrl = $("#shareUrlInput").value.trim();
-    const settings = readSettings();
+    const btn = $("#settingsForm [type=submit]");
 
-    if (scriptUrl || token) {
-      if (!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec$/i.test(scriptUrl)) {
-        settingsError("Web uygulaması adresi https://script.google.com/macros/s/…/exec biçiminde olmalı. Apps Script'te Dağıt > Dağıtımları yönet ekranından kopyalayın.");
-        return;
-      }
-      if (!token) { settingsError("Bağlantı anahtarını girin. E-Tabloda İş Takip > Bağlantı anahtarını göster menüsünden alabilirsiniz."); return; }
-      const store = new SheetsStore(scriptUrl, token);
-      const btn = $("#settingsForm [type=submit]");
+    if (!$("#googleFields").hidden) {
+      const secret = { scriptUrl: $("#scriptUrlInput").value.trim(), token: $("#tokenInput").value.trim() };
+      const currentPw = $("#currentPwInput").value;
+      const newPw = $("#newPwInput").value;
+      if (!validUrl(secret.scriptUrl)) { settingsError(URL_HELP); return; }
+      if (!secret.token) { settingsError("Bağlantı anahtarını girin."); return; }
+      if (!currentPw) { settingsError("Değişikliği kaydetmek için mevcut şifrenizi girin."); return; }
+      if (newPw) { const err = checkNewPassword(newPw); if (err) { settingsError(err); return; } }
       btn.disabled = true;
-      btn.textContent = "Bağlanıyor…";
+      btn.textContent = "Kaydediliyor…";
       try {
-        await store.load();
+        await openVault(readVault(), currentPw); // mevcut şifreyi doğrula
+        await new SheetsStore(secret.scriptUrl, secret.token).load();
+        writeJson(localStorage, VAULT_KEY, await sealVault(secret, newPw || currentPw));
       } catch (e) {
         settingsError(e.message || String(e));
         return;
@@ -993,33 +1246,32 @@
         btn.disabled = false;
         btn.textContent = "Kaydet ve bağlan";
       }
-      Object.assign(settings, { scriptUrl, token });
-    } else if (cfg.clientId && shareUrl) {
-      if (!/^https:\/\/[^/]+\.(sharepoint\.com|1drv\.ms|onedrive\.live\.com)\//i.test(shareUrl)) {
-        settingsError("Bu bir OneDrive / SharePoint linki gibi görünmüyor. Excel'de Paylaş > Bağlantıyı kopyala ile alınan linki yapıştırın.");
-        return;
-      }
-      settings.shareUrl = shareUrl;
-    } else {
-      settingsError("Web uygulaması adresini ve bağlantı anahtarını girin.");
+      writeSession(secret);
+      $("#settingsDialog").close();
+      toast(newPw ? "Bağlantı ve şifre güncellendi" : "Bağlantı güncellendi");
+      await connectSheets(secret);
       return;
     }
 
-    if (!writeSettings(settings)) {
-      toast("Tarayıcı ayarları kaydetmeye izin vermedi; bağlantı yalnızca bu oturumda geçerli.", true);
+    // Office 365 (Excel) bağlantı linki
+    const shareUrl = $("#shareUrlInput").value.trim();
+    if (!/^https:\/\/[^/]+\.(sharepoint\.com|1drv\.ms|onedrive\.live\.com)\//i.test(shareUrl)) {
+      settingsError("Bu bir OneDrive / SharePoint linki gibi görünmüyor. Excel'de Paylaş > Bağlantıyı kopyala ile alınan linki yapıştırın.");
+      return;
     }
-    $("#settingsDialog").close();
-    await start(settings);
-  }
-
-  async function disconnect() {
     const settings = readSettings();
-    delete settings.scriptUrl;
-    delete settings.token;
+    settings.shareUrl = shareUrl;
     writeSettings(settings);
     $("#settingsDialog").close();
-    toast("Google E-Tablolar bağlantısı kaldırıldı");
-    await start(settings);
+    await start();
+  }
+
+  function disconnect() {
+    removeKey(localStorage, VAULT_KEY);
+    removeKey(sessionStorage, SESSION_KEY);
+    $("#settingsDialog").close();
+    toast("Bağlantı bu cihazdan kaldırıldı. E-Tablodaki verileriniz duruyor.");
+    showLock("setup");
   }
 
   async function connectExcel() {
@@ -1029,32 +1281,28 @@
     await load();
   }
 
-  function setBadge(text, cls, title) {
-    const badge = $("#modeBadge");
-    badge.textContent = text;
-    badge.className = "badge " + cls;
-    badge.title = title || "";
-  }
-
   // ---- Başlangıç --------------------------------------------------------------
 
-  async function start(saved) {
-    saved = saved || readSettings();
-    $("#settingsBtn").hidden = false;
+  async function start() {
     $("#demoBanner").hidden = true;
+    setChrome();
 
-    // 1) Google E-Tablolar bağlıysa onu kullan
-    if (saved.scriptUrl && saved.token) {
-      state.store = new SheetsStore(saved.scriptUrl, saved.token);
-      setBadge("Google E-Tablolar'a bağlı", "live");
-      await load();
-      return;
-    }
+    // 1) Kilidi açık bir oturum varsa doğrudan Google E-Tablolar'a bağlan
+    const session = readSession();
+    if (session) { await connectSheets(session); return; }
 
-    // 2) Office 365 yapılandırılmışsa Microsoft girişi
+    // 2) Şifreli bağlantı kayıtlıysa şifre sor
+    if (readVault()) { showLock("unlock"); return; }
+
+    // 3) Eski sürümden kalan şifresiz bağlantı varsa şifre belirlet
+    const saved = readSettings();
+    if (saved.scriptUrl && saved.token) { showLock("migrate"); return; }
+
+    // 4) Office 365 yapılandırılmışsa Microsoft girişi
     if (cfg.clientId) {
       if (saved.shareUrl) cfg.shareUrl = saved.shareUrl;
       setBadge("Excel'e bağlı", "live");
+      setChrome({ refresh: true, settings: true });
       if (typeof msal === "undefined") {
         show("#signedOut");
         toast("Microsoft giriş kütüphanesi yüklenemedi. İnternet bağlantınızı kontrol edip sayfayı yenileyin.", true);
@@ -1077,15 +1325,27 @@
       return;
     }
 
-    // 3) Hiçbiri yoksa örnek verilerle demo
-    state.store = new DemoStore(cfg);
-    setBadge("Demo modu", "demo", "Ayarlar'dan Google E-Tablonuzu bağlayın");
-    $("#demoBanner").hidden = false;
-    await load();
+    // 5) Bu sekmede demo istendiyse örnek verilerle aç
+    if (isDemo()) {
+      state.store = new DemoStore(cfg);
+      setBadge("Demo modu", "demo", "Örnek veriler; kendi E-Tablonuzu bağlamak için Ayarlar");
+      setChrome({ refresh: true, settings: true });
+      $("#demoBanner").hidden = false;
+      await load();
+      return;
+    }
+
+    // 6) Hiçbiri yoksa kurulum ekranı
+    showLock("setup");
   }
 
   function init() {
     bindEvents();
+    $("#lockForm").addEventListener("submit", submitLock);
+    $("#forgotBtn").addEventListener("click", forgotPassword);
+    $("#demoBtn").addEventListener("click", () => { setDemo(true); start(); });
+    $("#lockBtn").addEventListener("click", () => lockNow("Sayfa kilitlendi."));
+    startIdleWatch();
     try {
       const v = localStorage.getItem("istakip-view");
       if (v === "board" || v === "list") {
