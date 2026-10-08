@@ -546,7 +546,8 @@ dialog textarea { resize: vertical; }
 .lock-card input { color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; font-size: 15px; }
 .btn.block { width: 100%; justify-content: center; margin-top: 14px; padding-block: 11px; }
 .lock-links { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 12px; font-size: 13px; }
-.lock-links a, .linklike { color: var(--primary); }
+.lock-links a, .lock-hint { color: var(--muted); }
+.linklike { color: var(--primary); }
 .linklike { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .linklike.confirm { color: var(--critical-text); font-weight: 700; }
 label > input, label > select, label > textarea { font-weight: 500; }

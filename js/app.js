@@ -1056,6 +1056,7 @@
     setup: ["İş Takip'i bağlayın",
       "Google E-Tablonuzun web uygulaması adresini ve bağlantı anahtarını girin, bu cihaz için bir şifre belirleyin. Bilgiler bu tarayıcıda şifrenizle kilitlenmiş olarak saklanır.",
       "Bağlan ve kilitle", "Yeni şifre"],
+    server: ["İş Takip kilitli", "Devam etmek için şifrenizi girin.", "Giriş yap", "Şifre"],
     migrate: ["Bir şifre belirleyin",
       "Bağlantı bilgileriniz artık şifreyle korunuyor. Bu cihazda kullanacağınız bir şifre belirleyin; sayfa her açılışta bu şifreyi soracak.",
       "Şifreyi kaydet", "Yeni şifre"]
@@ -1092,7 +1093,7 @@
     forgot.classList.remove("confirm");
     forgot.textContent = "Şifremi unuttum";
     lockError(message || "");
-    setBadge(mode === "unlock" ? "Kilitli" : "Bağlı değil", "demo");
+    setBadge(mode === "unlock" || mode === "server" ? "Kilitli" : "Bağlı değil", "demo");
     setChrome();
     $("#userName").textContent = "";
     show("#lockView");
@@ -1108,7 +1109,7 @@
     const label = btn.textContent;
     let secret;
 
-    if (mode === "unlock") {
+    if (mode === "unlock" || mode === "server") {
       if (!pw) { lockError("Şifrenizi girin."); return; }
     } else {
       const err = checkNewPassword(pw, $("#lockPw2").value);
@@ -1121,9 +1122,20 @@
     }
 
     btn.disabled = true;
-    btn.textContent = mode === "unlock" ? "Açılıyor…" : "Kaydediliyor…";
+    btn.textContent = mode === "unlock" || mode === "server" ? "Açılıyor…" : "Kaydediliyor…";
     try {
-      if (mode === "unlock") {
+      if (mode === "server") {
+        // Şifre Google tarafında doğrulanır
+        secret = { scriptUrl: cfg.sheetsUrl, token: pw };
+        try {
+          await new SheetsStore(secret.scriptUrl, secret.token).load();
+        } catch (e) {
+          const msg = e.message || String(e);
+          throw new Error(/hatalı\.$/.test(msg) && !/deneme/.test(msg)
+            ? "Şifre hatalı. Web şifresi henüz belirlenmediyse E-Tabloda İş Takip > 3. Web şifresi belirle menüsünü kullanın."
+            : msg);
+        }
+      } else if (mode === "unlock") {
         secret = await openVault(readVault(), pw);
       } else {
         if (mode === "migrate") {
@@ -1151,7 +1163,7 @@
     writeSession(secret);
     setDemo(false);
     await connectSheets(secret);
-    if (mode !== "unlock") toast("Şifre kaydedildi. Sayfa her açılışta bu şifreyi soracak.");
+    if (mode === "setup" || mode === "migrate") toast("Şifre kaydedildi. Sayfa her açılışta bu şifreyi soracak.");
   }
 
   function forgotPassword() {
@@ -1169,7 +1181,7 @@
 
   function lockNow(message) {
     removeKey(sessionStorage, SESSION_KEY);
-    showLock(readVault() ? "unlock" : "setup", message);
+    showLock(cfg.sheetsUrl ? "server" : readVault() ? "unlock" : "setup", message);
   }
 
   function startIdleWatch() {
@@ -1186,7 +1198,8 @@
   async function connectSheets(secret) {
     state.store = new SheetsStore(secret.scriptUrl, secret.token);
     setBadge("Google E-Tablolar'a bağlı", "live");
-    setChrome({ refresh: true, settings: true, lock: true });
+    // Merkezi şifre kullanılıyorsa cihazda değiştirilecek bağlantı ayarı yoktur
+    setChrome({ refresh: true, settings: !cfg.sheetsUrl, lock: true });
     $("#demoBanner").hidden = true;
     await load();
   }
@@ -1286,6 +1299,15 @@
   async function start() {
     $("#demoBanner").hidden = true;
     setChrome();
+
+    // 0) Web uygulaması adresi yapılandırılmışsa her cihazda yalnızca şifre sorulur
+    if (cfg.sheetsUrl) {
+      const s = readSession();
+      if (s && s.scriptUrl === cfg.sheetsUrl) { await connectSheets(s); return; }
+      removeKey(sessionStorage, SESSION_KEY);
+      showLock("server");
+      return;
+    }
 
     // 1) Kilidi açık bir oturum varsa doğrudan Google E-Tablolar'a bağlan
     const session = readSession();

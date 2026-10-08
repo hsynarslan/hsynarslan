@@ -11,7 +11,12 @@ const SHEET_UNITS = "Birimler";
 const SHEET_SUBS = "AltGörevler";
 
 // Web sayfası bu numaraya bakarak hangi özelliklerin desteklendiğini anlar.
-const API_VERSION = 2;
+const API_VERSION = 3;
+
+// Web şifresi: art arda hatalı denemelerde geçici kilit
+const PW_MIN = 8;
+const PW_MAX_FAILS = 10;
+const PW_LOCK_SECONDS = 15 * 60;
 
 // Alan adı -> E-Tablodaki başlık. Sütun sırası önemli değil, başlık adına göre eşleştirilir.
 const COLUMNS = {
@@ -48,6 +53,7 @@ function onOpen() {
     .createMenu("İş Takip")
     .addItem("1. Kurulumu yap", "kurulum")
     .addItem("2. Bağlantı anahtarını göster", "anahtariGoster")
+    .addItem("3. Web şifresi belirle", "webSifresiBelirle")
     .addItem("Bağlantı anahtarını yenile", "anahtariYenile")
     .addToUi();
 }
@@ -138,6 +144,52 @@ function anahtariYenile() {
   ui.alert("Yeni bağlantı anahtarı", getToken_(true), ui.ButtonSet.OK);
 }
 
+// ---- Web şifresi -------------------------------------------------------------------
+// Web sayfası her cihazda yalnızca bu şifreyi sorar. Şifre düz metin olarak değil,
+// rastgele tuz ile SHA-256 özeti olarak Script Properties'te saklanır.
+
+function webSifresiBelirle() {
+  const html = HtmlService.createHtmlOutput(
+    '<style>body{font-family:Arial,sans-serif;font-size:14px;margin:0;padding:4px 2px}' +
+    'label{display:block;margin:10px 0 4px;font-weight:bold}input{width:100%;box-sizing:border-box;padding:8px;font-size:14px}' +
+    'button{margin-top:14px;padding:8px 16px;font-size:14px;background:#1a73e8;color:#fff;border:0;border-radius:4px;cursor:pointer}' +
+    '#m{margin-top:10px;color:#c5221f}</style>' +
+    '<div>İş Takip sayfasında her cihazda bu şifre sorulacak (en az ' + PW_MIN + ' karakter).</div>' +
+    '<label>Yeni şifre</label><input id="a" type="password" autofocus>' +
+    '<label>Yeni şifre (tekrar)</label><input id="b" type="password">' +
+    '<button id="k">Kaydet</button><div id="m"></div>' +
+    '<script>' +
+    'document.getElementById("k").onclick=function(){' +
+    'var a=document.getElementById("a").value,b=document.getElementById("b").value,m=document.getElementById("m");' +
+    'if(a.length<' + PW_MIN + '){m.textContent="Şifre en az ' + PW_MIN + ' karakter olmalı.";return;}' +
+    'if(a!==b){m.textContent="Şifreler aynı değil.";return;}' +
+    'this.disabled=true;m.style.color="#555";m.textContent="Kaydediliyor…";' +
+    'google.script.run.withSuccessHandler(function(){m.style.color="#188038";m.textContent="Şifre kaydedildi. Bu pencereyi kapatabilirsiniz.";})' +
+    '.withFailureHandler(function(e){m.style.color="#c5221f";m.textContent=e.message;document.getElementById("k").disabled=false;})' +
+    '.sifreKaydet(a);};' +
+    '</script>'
+  ).setWidth(380).setHeight(290);
+  SpreadsheetApp.getUi().showModalDialog(html, "Web şifresi belirle");
+}
+
+// HTML penceresinden çağrılır
+function sifreKaydet(password) {
+  password = String(password || "");
+  if (password.length < PW_MIN) throw new Error("Şifre en az " + PW_MIN + " karakter olmalı.");
+  getToken_(true); // kurulum yapılmamışsa anahtarı da oluştur
+  const salt = Utilities.getUuid();
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty("PW_SALT", salt);
+  props.setProperty("PW_HASH", hashPassword_(salt, password));
+  CacheService.getScriptCache().remove("pw_fails");
+  return true;
+}
+
+function hashPassword_(salt, password) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, salt + ":" + password, Utilities.Charset.UTF_8);
+  return bytes.map((b) => ("0" + (b & 0xff).toString(16)).slice(-2)).join("");
+}
+
 // ---- Web uygulaması uç noktaları ---------------------------------------------
 
 function doGet(e) {
@@ -192,10 +244,25 @@ function getToken_(create) {
   return token;
 }
 
+// İstekler bağlantı anahtarıyla ya da web şifresiyle yetkilendirilir.
 function checkToken_(token) {
   const real = getToken_(false);
   if (!real) throw new Error("Kurulum yapılmamış. E-Tabloda İş Takip > 1. Kurulumu yap menüsünü çalıştırın.");
-  if (String(token || "") !== real) throw new Error("Bağlantı anahtarı hatalı.");
+  token = String(token || "");
+  if (token === real) return;
+
+  const props = PropertiesService.getScriptProperties();
+  const hash = props.getProperty("PW_HASH");
+  if (hash) {
+    const cache = CacheService.getScriptCache();
+    const fails = Number(cache.get("pw_fails") || 0);
+    if (fails >= PW_MAX_FAILS) {
+      throw new Error("Çok fazla hatalı deneme yapıldı. " + Math.round(PW_LOCK_SECONDS / 60) + " dakika sonra tekrar deneyin.");
+    }
+    if (hashPassword_(props.getProperty("PW_SALT"), token) === hash) return;
+    cache.put("pw_fails", String(fails + 1), PW_LOCK_SECONDS);
+  }
+  throw new Error("Şifre ya da bağlantı anahtarı hatalı.");
 }
 
 function normalize_(s) {

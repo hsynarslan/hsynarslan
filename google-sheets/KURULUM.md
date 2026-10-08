@@ -81,6 +81,23 @@ birkaç saniye içinde E-Tablonun **Görevler** sayfasında görünür.
 
 ---
 
+## Her cihazda yalnızca şifre (önerilen)
+
+Adres ve anahtarı her cihazda ayrı ayrı girmek yerine, şifreyi Google tarafında bir kez belirleyebilirsiniz.
+Bundan sonra sayfa **hangi cihazdan açılırsa açılsın yalnızca şifrenizi sorar.**
+
+1. Kod.gs'in güncel sürümünü yükleyin (aşağıdaki **Kodu güncellemek gerekirse** bölümü).
+2. E-Tabloda **İş Takip → 3. Web şifresi belirle** menüsünü açın, şifrenizi iki kez yazıp **Kaydet** deyin
+   (en az 8 karakter).
+3. Web uygulaması adresinin (`…/exec`) sayfanın ayarlarına (`js/config.js` → `sheetsUrl`) yazılması gerekir.
+   Bunu bir kez yapmak yeterlidir.
+
+Güvenlik:
+- Şifre Google'da düz metin olarak değil, tuzlanmış SHA-256 özeti olarak saklanır; E-Tabloyu açan biri bile göremez.
+- 15 dakika içinde 10 hatalı denemeden sonra şifreyle giriş 15 dakika kapanır.
+- Şifreyi değiştirmek ya da unuttuğunuzda yenisini belirlemek için 2. adımı tekrarlayın.
+- Adres herkese açık olsa bile tek başına işe yaramaz; her istekte şifre ya da bağlantı anahtarı gerekir.
+
 ## Sık karşılaşılan sorunlar
 
 | Mesaj | Çözüm |
