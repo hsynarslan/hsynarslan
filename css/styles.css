@@ -683,3 +683,166 @@ label > input, label > select, label > textarea { font-weight: 500; }
   .unit-row, .upcoming li, .legend li { min-height: 44px; }
   .stat:hover, .card:hover { transform: none; }
 }
+
+/* ---- Rapor menüsü ------------------------------------------------------------ */
+
+.toolbar-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.menu { position: relative; }
+.menu > summary { list-style: none; }
+.menu > summary::-webkit-details-marker { display: none; }
+.menu-list {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; min-width: 250px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(10, 25, 40, .18); padding: 6px; display: grid;
+}
+.menu-list button {
+  border: 0; background: none; color: var(--text); text-align: left; cursor: pointer;
+  padding: 10px 12px; border-radius: 8px; font-weight: 500;
+}
+.menu-list button:hover { background: var(--surface-2); }
+
+/* Görev başlığındaki bağlantı ve tekrar işaretleri */
+.t-link {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; margin-left: 6px; vertical-align: -5px;
+  border-radius: 6px; color: var(--primary); background: var(--progress-bg);
+}
+.t-link:hover { filter: brightness(.95); }
+.t-repeat {
+  display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; vertical-align: 1px;
+  font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap;
+}
+
+/* Panoda dokunmatik ekranlar için "Taşı" seçimi */
+.card-move { display: none; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.card-move select {
+  flex: 1; min-width: 0; color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px;
+}
+@media (pointer: coarse) {
+  .card-move { display: flex; }
+  .card { cursor: pointer; }
+}
+
+/* ---- Yorumlar ve geçmiş -------------------------------------------------------- */
+
+.hist { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.hist .sub-add-row { margin: 0 0 10px; }
+.hist #commentInput { flex: 1 1 220px; min-width: 0; }
+.hist-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 280px; overflow-y: auto; }
+.hist-list li { padding: 8px 10px; border-radius: 8px; background: var(--surface-2); }
+.hist-list li.is-comment { background: var(--progress-bg); }
+.hist-meta { font-size: 12px; color: var(--muted); display: flex; gap: 4px; flex-wrap: wrap; }
+.hist-meta b { color: var(--text); }
+.hist-meta span { margin-left: auto; font-variant-numeric: tabular-nums; }
+.hist-detail { margin-top: 2px; font-size: 13px; overflow-wrap: anywhere; }
+.hist-list li.sub-empty { background: none; padding: 6px 2px; color: var(--muted); font-size: 13px; }
+.repeat-help { margin-top: 8px; font-size: 12px; }
+
+/* ---- Zaman çizelgesi (Gantt) ------------------------------------------------- */
+
+.gantt { --label: 260px; background: var(--surface); }
+.g-tools {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 18px; border-bottom: 1px solid var(--border);
+}
+.g-legend { list-style: none; margin: 0 0 0 auto; padding: 0; display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.g-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.g-sw { display: inline-block; width: 14px; height: 8px; border-radius: 4px; }
+.g-sw.done { background: var(--good); } .g-sw.prog { background: var(--progress); }
+.g-sw.todo { background: var(--neutral); } .g-sw.over { background: var(--critical); }
+.g-sw.sub { width: 9px; height: 9px; border-radius: 2px; transform: rotate(45deg); background: var(--surface); border: 2px solid var(--text); }
+
+.g-scroll { overflow: auto; max-height: min(70vh, 720px); overscroll-behavior-x: contain; position: relative; }
+.g-inner { width: calc(var(--label) + var(--w)); position: relative; }
+.g-head {
+  position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: var(--label) var(--w);
+  background: var(--surface-2); border-bottom: 1px solid var(--border);
+}
+.g-corner {
+  position: sticky; left: 0; z-index: 4; background: var(--surface-2); border-right: 1px solid var(--border);
+  padding: 0 14px; display: flex; align-items: flex-end; padding-bottom: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+}
+.g-scale { position: relative; height: 46px; }
+.g-months, .g-ticks { position: relative; height: 23px; }
+.g-month, .g-tick {
+  position: absolute; top: 0; height: 100%; display: flex; align-items: center;
+  font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums;
+}
+.g-month { padding-left: 6px; font-weight: 700; color: var(--text); border-left: 1px solid var(--border); }
+.g-tick { padding-left: 4px; border-left: 1px solid var(--border); }
+.g-tick.we { background: color-mix(in srgb, var(--border) 45%, transparent); }
+.g-tick.now { color: var(--primary-text); background: var(--primary); font-weight: 700; justify-content: center; padding: 0; }
+
+.g-body { position: relative; }
+.g-row { display: grid; grid-template-columns: var(--label) var(--w); min-height: 40px; cursor: pointer; }
+.g-row:hover .g-label, .g-row:hover .g-track { background-color: var(--surface-2); }
+.g-label {
+  position: sticky; left: 0; z-index: 2; background: var(--surface); border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; padding: 0 14px; min-width: 0;
+}
+.g-label .avatar { flex: none; }
+.g-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 13px; }
+.g-row.is-done .g-title { color: var(--muted); text-decoration: line-through; }
+.g-track {
+  position: relative; border-bottom: 1px solid var(--border);
+  /* Haftalık ızgara çizgileri; ölçek her zaman pazartesiden başlar */
+  background-image: repeating-linear-gradient(to right, var(--border) 0 1px, transparent 1px calc(var(--day) * 7));
+}
+.g-bar, .g-over { position: absolute; top: 50%; height: 12px; margin-top: -6px; border-radius: 4px; }
+.g-bar.done { background: var(--good); }
+.g-bar.prog { background: var(--progress); }
+.g-bar.todo { background: var(--neutral); }
+.g-over { background: var(--critical); pointer-events: none; }
+.g-sub {
+  position: absolute; top: 50%; width: 10px; height: 10px; margin-top: -5px; transform: rotate(45deg);
+  background: var(--surface); border: 2px solid var(--text); border-radius: 2px; z-index: 1;
+}
+.g-sub.done { background: var(--good); border-color: var(--surface); box-shadow: 0 0 0 1px var(--good); }
+.g-today { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--primary); z-index: 1; pointer-events: none; }
+
+@media (max-width: 760px) {
+  .gantt { --label: 140px; }
+  .g-tools { padding: 10px 14px; }
+  .g-legend { margin-left: 0; width: 100%; }
+  .g-label { padding: 0 8px; gap: 6px; }
+  .g-label .avatar { display: none; }
+  .g-title { font-size: 12px; }
+  .toolbar-right { width: 100%; }
+  .toolbar-right .menu { flex: 1; }
+  .toolbar-right .menu > summary { width: 100%; justify-content: center; }
+  .toolbar-right #newBtn { flex: 1; justify-content: center; margin-left: 0; }
+  .menu-list { left: 0; right: auto; }
+  .hist-meta span { margin-left: 0; width: 100%; }
+}
+
+/* ---- Yazdırma / PDF ------------------------------------------------------------- */
+
+.print-only { display: none; }
+
+@media print {
+  @page { margin: 14mm; }
+  :root { color-scheme: light; }
+  body { background: #fff; font-size: 11px; }
+  .hero, .demo-banner, .filters, .toolbar .seg, .toolbar-right, .c-act, .board, .gantt, .insights,
+  .tooltip, .toast, dialog, .sub-progress .chev, .t-link { display: none !important; }
+  .print-only { display: block; }
+  .print-head { margin: 0 0 8px; font-weight: 700; font-size: 14px; }
+  main { margin: 0; padding: 0; max-width: none; }
+  .stats { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .stat, .panel { box-shadow: none; break-inside: avoid; }
+  .stat-icon { display: none; }
+  .stat { grid-template-columns: 1fr; padding: 8px 10px; }
+  #listView { display: block !important; }
+  .panel { border: 0; overflow: visible; }
+  table.tasks { display: table !important; }
+  table.tasks thead { display: table-header-group !important; }
+  .tasks tr { display: table-row !important; position: static !important; padding: 0 !important; break-inside: avoid; }
+  .tasks td, .tasks th { display: table-cell !important; position: static !important; width: auto !important; padding: 5px 6px !important; margin: 0 !important; }
+  .tasks td.t-id { display: table-cell !important; }
+  .tasks td.c-act, .tasks th:last-child { display: none !important; }
+  .tasks tr.sub-row { display: none !important; }
+  .tick { width: 14px; height: 14px; }
+  .pill, .due-rel { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #noRows { display: none !important; }
+}

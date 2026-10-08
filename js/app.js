@@ -18,8 +18,18 @@
     features: {},
     expanded: new Set(),
     pendingSubs: [],
-    unitEdit: null
+    unitEdit: null,
+    dialogBase: null,
+    actor: "",
+    loadedAt: 0,
+    loading: false,
+    ganttZoom: "week",
+    urlFilters: null
   };
+
+  const NAME_KEY = "istakip-ad";
+  const REFRESH_MS = 5 * 60 * 1000;
+  const GANTT_ZOOM = { day: 32, week: 14, month: 5 };
 
   const MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 
@@ -64,6 +74,57 @@
   }
 
   function isActive(t) { return t.status !== "İptal"; }
+
+  function addDays(iso, n) {
+    const [y, m, d] = iso.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d + n));
+    return dt.toISOString().slice(0, 10);
+  }
+
+  // Ay sonu taşmasını önler: 31 Ocak + 1 ay = 28/29 Şubat
+  function addMonths(iso, n) {
+    const [y, m, d] = iso.split("-").map(Number);
+    const last = new Date(Date.UTC(y, m - 1 + n + 1, 0)).getUTCDate();
+    return new Date(Date.UTC(y, m - 1 + n, Math.min(d, last))).toISOString().slice(0, 10);
+  }
+
+  function shiftByRepeat(iso, repeat) {
+    if (!iso) return "";
+    if (repeat === "Haftalık") return addDays(iso, 7);
+    if (repeat === "Aylık") return addMonths(iso, 1);
+    if (repeat === "Yıllık") return addMonths(iso, 12);
+    return iso;
+  }
+
+  function safeLink(url) {
+    return /^https?:\/\/[^\s"'<>]+$/i.test(String(url || "").trim()) ? String(url).trim() : "";
+  }
+
+  function linkHtml(t) {
+    const url = safeLink(t.link);
+    return url ? `<a class="t-link" href="${esc(url)}" target="_blank" rel="noopener" title="Bağlantıyı aç" aria-label="Bağlantıyı aç"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></a>` : "";
+  }
+
+  function repeatHtml(t) {
+    return t.repeat ? `<span class="t-repeat" title="${esc(t.repeat)} tekrar eder"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(t.repeat)}</span>` : "";
+  }
+
+  // Zamanında bitirme oranı ve ortalama gecikme (biten geç işler + hâlâ geciken işler)
+  function metrics(list) {
+    const today = todayIso();
+    const finished = list.filter((t) => t.done && t.due && t.doneDate);
+    const onTime = finished.filter((t) => t.doneDate <= t.due).length;
+    const delays = [
+      ...finished.filter((t) => t.doneDate > t.due).map((t) => daysBetween(t.due, t.doneDate)),
+      ...list.filter(isLate).map((t) => daysBetween(t.due, today))
+    ];
+    return {
+      onTimePct: finished.length ? pct(onTime, finished.length) : null,
+      finished: finished.length,
+      avgDelay: delays.length ? Math.round((delays.reduce((a, b) => a + b, 0) / delays.length) * 10) / 10 : 0,
+      delayed: delays.length
+    };
+  }
 
   function bucketOf(t) {
     if (t.done) return "done";
@@ -204,6 +265,7 @@
 
     const done = active.length - open.length;
     const p = pct(done, active.length);
+    const m = metrics(active);
     const r = 52, c = 2 * Math.PI * r;
     $("#heroRing").innerHTML = `
       <svg width="132" height="132" viewBox="0 0 132 132" role="img" aria-label="Tamamlanma oranı yüzde ${p}">
@@ -216,6 +278,8 @@
       <div class="ring-legend">
         <span><b>${done}</b> / ${active.length} iş bitti</span>
         <span><b>${state.units.length}</b> birim</span>
+        ${m.onTimePct !== null ? `<span title="Termini olan ve biten ${m.finished} işten zamanında bitenlerin oranı">Zamanında bitirme <b>%${m.onTimePct}</b></span>` : ""}
+        ${m.delayed ? `<span title="Geç biten ve hâlâ geciken ${m.delayed} işin ortalaması">Ort. gecikme <b>${String(m.avgDelay).replace(".", ",")} gün</b></span>` : ""}
       </div>`;
   }
 
@@ -259,7 +323,10 @@
       const n = { done: 0, prog: 0, late: 0, todo: 0 };
       list.forEach((t) => n[bucketOf(t)]++);
       const w = (x) => (list.length ? (x / list.length) * 100 : 0);
-      const tip = `<b>${esc(u)}</b><br>${n.done} tamamlandı · ${n.prog} devam ediyor<br>${n.late} gecikmiş · ${n.todo} başlanmadı`;
+      const um = metrics(list);
+      const tip = `<b>${esc(u)}</b><br>${n.done} tamamlandı · ${n.prog} devam ediyor<br>${n.late} gecikmiş · ${n.todo} başlanmadı` +
+        (um.onTimePct !== null ? `<br>Zamanında bitirme %${um.onTimePct}` : "") +
+        (um.delayed ? ` · ort. gecikme ${String(um.avgDelay).replace(".", ",")} gün` : "");
       return `<button class="unit-row ${unitFilter === u ? "active" : ""}" data-unit="${esc(u)}" data-tip="${esc(tip)}">
         ${avatar(u)}
         <span class="unit-name">${esc(u)}</span>
@@ -361,7 +428,7 @@
       <tr class="${t.done ? "is-done" : ""} ${isLate(t) ? "is-late" : ""}" data-id="${esc(t.id)}">
         <td class="c-done"><input class="tick" type="checkbox" data-action="toggle" ${t.done ? "checked" : ""} aria-label="${esc(t.id)} tamamlandı"></td>
         <td class="t-id">${esc(t.id)}</td>
-        <td class="c-title"><div class="t-title">${esc(t.title)}</div>${t.note ? `<div class="t-note">${esc(t.note)}</div>` : ""}${subProgressHtml(t, true)}</td>
+        <td class="c-title"><div class="t-title">${esc(t.title)}${linkHtml(t)}${repeatHtml(t)}</div>${t.note ? `<div class="t-note">${esc(t.note)}</div>` : ""}${subProgressHtml(t, true)}</td>
         <td><span class="unit-cell">${avatar(t.unit, true)}${esc(t.unit)}</span></td>
         <td>${prioHtml(t.priority)}</td>
         <td>${dueHtml(t)}</td>
@@ -397,7 +464,7 @@
           return `<article class="card ${t.done ? "is-done" : ""} ${isLate(t) ? "is-late" : ""}" draggable="true" data-id="${esc(t.id)}">
             <div class="card-top">
               <input class="tick" type="checkbox" data-action="toggle" ${t.done ? "checked" : ""} aria-label="${esc(t.id)} tamamlandı">
-              <div class="card-title">${esc(t.title)}${subProgressHtml(t, false) ? `<div>${subProgressHtml(t, false)}</div>` : ""}</div>
+              <div class="card-title">${esc(t.title)}${linkHtml(t)}${repeatHtml(t)}${subProgressHtml(t, false) ? `<div>${subProgressHtml(t, false)}</div>` : ""}</div>
             </div>
             <div class="card-foot">
               <span class="unit-cell">${avatar(t.unit, true)}${esc(t.unit)}</span>
@@ -407,10 +474,137 @@
               <span>${esc(t.id)}</span>
               ${info ? `<span class="due-rel ${info.cls}">${info.text}</span>` : ""}
             </div>
+            <label class="card-move">Taşı:
+              <select data-action="move" aria-label="${esc(t.id)} durumunu değiştir">
+                ${cfg.statuses.map((x) => `<option${x === t.status ? " selected" : ""}>${esc(x)}</option>`).join("")}
+              </select>
+            </label>
           </article>`;
         }).join("") || `<div class="col-empty">Buraya sürükleyin</div>`}
       </section>`;
     }).join("");
+  }
+
+  // ---- Görünüm: zaman çizelgesi (Gantt) ------------------------------------------
+  // Çubuk: atama tarihinden termine planlanan süre, rengi duruma göre. Kırmızı uzantı: termini aşan kısım
+  // (biten işte tamamlanma tarihine, açık işte bugüne kadar). Elmas: alt paket terminleri.
+
+  function ganttItems(rows) {
+    const today = todayIso();
+    return rows.filter((t) => t.assigned || t.due).map((t) => {
+      let start = t.assigned || t.due, end = t.due || t.assigned;
+      if (end < start) [start, end] = [end, start];
+      let over = "";
+      if (t.done && t.doneDate && t.due && t.doneDate > t.due) over = t.doneDate;
+      else if (isLate(t)) over = today;
+      return { t, start, end, over };
+    }).sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : a.end < b.end ? -1 : 1));
+  }
+
+  function renderGantt(rows) {
+    const el = $("#ganttView");
+    const items = ganttItems(rows);
+    const zoom = state.ganttZoom;
+    const controls = `<div class="g-tools">
+        <div class="seg" role="group" aria-label="Ölçek">
+          ${[["day", "Gün"], ["week", "Hafta"], ["month", "Ay"]].map(([k, l]) =>
+            `<button type="button" class="seg-btn ${zoom === k ? "active" : ""}" data-zoom="${k}">${l}</button>`).join("")}
+        </div>
+        <button type="button" class="btn small" data-gantt="today">Bugüne git</button>
+        <ul class="g-legend" aria-label="Açıklama">
+          <li><i class="g-sw done"></i>Tamamlandı</li><li><i class="g-sw prog"></i>Devam ediyor</li>
+          <li><i class="g-sw todo"></i>Başlanmadı</li><li><i class="g-sw over"></i>Termin aşımı</li>
+          <li><i class="g-sw sub"></i>Alt paket</li>
+        </ul>
+      </div>`;
+    if (!items.length) {
+      el.innerHTML = controls + `<p class="no-rows">Atama ya da termin tarihi olan görev yok.</p>`;
+      return;
+    }
+    const today = todayIso();
+    let min = items.reduce((m, i) => (i.start < m ? i.start : m), today);
+    let max = items.reduce((m, i) => [i.end, i.over || i.end].reduce((a, b) => (b > a ? b : a), m), today);
+    min = addDays(min, -3);
+    const dow = (new Date(min + "T00:00:00Z").getUTCDay() + 6) % 7; // 0 = Pazartesi
+    min = addDays(min, -dow);
+    max = addDays(max, 10);
+    const day = GANTT_ZOOM[zoom];
+    const days = daysBetween(min, max) + 1;
+    const width = days * day;
+    const x = (iso) => daysBetween(min, iso) * day;
+
+    // Üst ölçek: aylar ve günler / haftalar
+    let months = "", ticks = "";
+    for (let d = min; d <= max; ) {
+      const [y, m] = d.split("-").map(Number);
+      const next = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+      const end = next > max ? addDays(max, 1) : next;
+      const w = daysBetween(d, end) * day;
+      months += `<span class="g-month" style="left:${x(d)}px;width:${w}px">${w > 44 ? `${MONTHS[m - 1]} ${y}` : ""}</span>`;
+      d = next;
+    }
+    for (let d = min, i = 0; d <= max; d = addDays(d, 1), i++) {
+      const wd = i % 7;
+      if (zoom === "day") ticks += `<span class="g-tick${wd > 4 ? " we" : ""}${d === today ? " now" : ""}" style="left:${x(d)}px;width:${day}px">${+d.slice(8)}</span>`;
+      else if (wd === 0) ticks += `<span class="g-tick" style="left:${x(d)}px;width:${day * 7}px">${zoom === "week" ? `${+d.slice(8)} ${MONTHS[+d.slice(5, 7) - 1]}` : +d.slice(8)}</span>`;
+    }
+
+    const body = items.map(({ t, start, end, over }) => {
+      const b = bucketOf(t) === "late" ? (t.status === "Devam Ediyor" ? "prog" : "todo") : bucketOf(t);
+      const left = x(start), w = Math.max((daysBetween(start, end) + 1) * day, 6);
+      const tip = `<b>${esc(t.id)} · ${esc(t.title)}</b><br>${esc(t.unit)}<br>${fmtDate(start)} → ${fmtDate(end)}` +
+        (t.done ? `<br>Bitti: ${fmtDate(t.doneDate) || "—"}` : "") + (dueInfo(t) ? `<br>${dueInfo(t).text}` : "");
+      const overHtml = over ? `<span class="g-over" style="left:${left + w + 2}px;width:${Math.max(daysBetween(end, over) * day - 2, 3)}px"></span>` : "";
+      const subs = state.features.subtasks ? subsOf(t.id).filter((s) => s.due && s.due >= min && s.due <= max) : [];
+      const subHtml = subs.map((s) => `<span class="g-sub${s.done ? " done" : ""}" style="left:${x(s.due) + day / 2 - 5}px" data-tip="${esc(`<b>${s.id}</b> ${s.title}<br>${fmtDate(s.due)}${s.done ? " · bitti" : ""}`)}"></span>`).join("");
+      return `<div class="g-row${t.done ? " is-done" : ""}" data-id="${esc(t.id)}">
+        <div class="g-label">${avatar(t.unit, true)}<span class="g-title">${esc(t.title)}</span></div>
+        <div class="g-track"><span class="g-bar ${b}" style="left:${left}px;width:${w}px" data-tip="${esc(tip)}"></span>${overHtml}${subHtml}</div>
+      </div>`;
+    }).join("");
+
+    const prevScroll = el.querySelector(".g-scroll");
+    const keep = prevScroll && prevScroll.dataset.scale === zoom ? prevScroll.scrollLeft : null;
+    el.innerHTML = controls + `<div class="g-scroll" data-scale="${zoom}" style="--day:${day}px;--w:${width}px">
+      <div class="g-inner">
+        <div class="g-head"><div class="g-corner">Görev</div><div class="g-scale"><div class="g-months">${months}</div><div class="g-ticks">${ticks}</div></div></div>
+        <div class="g-body">${body}<span class="g-today" style="left:calc(var(--label) + ${x(today) + day / 2}px)" title="Bugün"></span></div>
+      </div>
+    </div>`;
+    const sc = el.querySelector(".g-scroll");
+    sc.dataset.todayX = x(today);
+    sc.scrollLeft = keep !== null ? keep : Math.max(x(today) - sc.clientWidth / 3, 0);
+  }
+
+  // ---- Adres çubuğundaki filtreler: görünüm bağlantı olarak paylaşılabilir --------------
+
+  function readUrlFilters() {
+    const p = new URLSearchParams(location.search);
+    return {
+      unit: p.get("birim") || "", status: p.get("durum") || "", q: p.get("ara") || "",
+      overdue: p.get("geciken") === "1", hideDone: p.get("gizle") === "1", view: p.get("gorunum") || ""
+    };
+  }
+
+  function syncUrl() {
+    const p = new URLSearchParams();
+    const set = (k, v) => { if (v) p.set(k, v); };
+    set("birim", $("#unitFilter").value);
+    set("durum", $("#statusFilter").value);
+    set("ara", $("#search").value.trim());
+    set("geciken", $("#overdueOnly").checked ? "1" : "");
+    set("gizle", $("#hideDone").checked ? "1" : "");
+    set("gorunum", state.view !== "list" ? { board: "pano", gantt: "zaman" }[state.view] : "");
+    const qs = p.toString();
+    const url = location.pathname + (qs ? "?" + qs : "") + location.hash;
+    if (url !== location.pathname + location.search + location.hash) {
+      try { history.replaceState(null, "", url); } catch (_) {}
+    }
+  }
+
+  function setView(view) {
+    state.view = ["list", "board", "gantt"].includes(view) ? view : "list";
+    document.querySelectorAll(".toolbar .seg-btn").forEach((b) => b.classList.toggle("active", b.dataset.view === state.view));
   }
 
   function renderFiltered() {
@@ -418,15 +612,28 @@
     $("#resultCount").textContent = `${rows.length} / ${state.tasks.length} görev`;
     $("#listView").hidden = state.view !== "list";
     $("#boardView").hidden = state.view !== "board";
-    if (state.view === "list") renderTable(rows); else renderBoard(rows);
-    $("#noRows").hidden = rows.length > 0 || state.view === "board";
+    $("#ganttView").hidden = state.view !== "gantt";
+    if (state.view === "list") renderTable(rows);
+    else if (state.view === "board") renderBoard(rows);
+    else renderGantt(rows);
+    $("#noRows").hidden = rows.length > 0 || state.view !== "list";
     renderStats();
     renderUnitProgress();
+    syncUrl();
   }
 
   function render() {
     fillSelect($("#unitFilter"), state.units, "Tüm birimler");
     fillSelect($("#statusFilter"), cfg.statuses, "Tüm durumlar");
+    if (state.urlFilters) {
+      const f = state.urlFilters;
+      state.urlFilters = null;
+      if (state.units.includes(f.unit)) $("#unitFilter").value = f.unit;
+      if (cfg.statuses.includes(f.status)) $("#statusFilter").value = f.status;
+      $("#search").value = f.q;
+      $("#overdueOnly").checked = f.overdue;
+      $("#hideDone").checked = f.hideDone;
+    }
     renderHero();
     renderStatusChart();
     renderUpcoming();
@@ -435,11 +642,15 @@
 
   // ---- Veri işlemleri ---------------------------------------------------------
 
-  async function load() {
-    if (!state.store) return;
-    show("#loading");
+  // quiet: arka planda yenile (yükleniyor ekranı gösterme, hata olursa sessiz kal)
+  async function load(quiet) {
+    if (!state.store || state.loading) return;
+    state.loading = true;
+    state.store.actor = state.actor;
+    if (!quiet) show("#loading");
     try {
       const data = await state.store.load();
+      state.loadedAt = Date.now();
       state.tasks = data.tasks;
       state.units = data.units;
       state.unitInfo = data.unitInfo || data.units.map((name) => ({ name, owner: "", email: "" }));
@@ -447,16 +658,51 @@
       state.features = state.store.features || {};
       $("#unitsBtn").hidden = !state.features.units;
       $("#updateBanner").hidden = !state.features.needsUpdate;
+      document.querySelectorAll("[data-feature]").forEach((el) => { el.hidden = !state.features[el.dataset.feature]; });
+      if (state.auth && state.auth.account) state.store.actor = state.auth.account.name || state.auth.account.username;
+      renderWho();
       render();
       show("#appView");
+      if (state.features.history && !state.actor && !(state.auth && state.auth.account)) askName();
     } catch (e) {
       console.error(e);
-      show("#appView");
-      toast(e.message || String(e), true);
+      if (!quiet) { show("#appView"); toast(e.message || String(e), true); }
+    } finally {
+      state.loading = false;
     }
   }
 
-  async function saveTask(task, isNew) {
+  // Sekmeye dönünce ve açıkken 5 dakikada bir başkalarının değişikliklerini getir
+  function startAutoRefresh() {
+    const due = () => document.visibilityState === "visible" && state.store && !$("#appView").hidden &&
+      !document.querySelector("dialog[open]") && Date.now() - state.loadedAt > 60000;
+    document.addEventListener("visibilitychange", () => { if (due()) load(true); });
+    setInterval(() => { if (due() && Date.now() - state.loadedAt > REFRESH_MS) load(true); }, 30000);
+  }
+
+  // ---- Kim düzenliyor ----------------------------------------------------------------
+
+  function setActor(name) {
+    state.actor = String(name || "").trim().slice(0, 60);
+    try { localStorage.setItem(NAME_KEY, state.actor); } catch (_) {}
+    if (state.store) state.store.actor = state.actor;
+    renderWho();
+  }
+
+  function renderWho() {
+    const msAccount = state.auth && state.auth.account;
+    $("#whoBtn").hidden = !!msAccount || !state.features.history;
+    $("#whoName").textContent = state.actor || "Adınızı girin";
+  }
+
+  function askName() {
+    $("#nameInput").value = state.actor;
+    $("#nameDialog").showModal();
+    $("#nameInput").focus();
+  }
+
+  // base: görevin düzenlemeye başlandığı andaki hali (aynı anda düzenleme kontrolü için)
+  async function saveTask(task, isNew, base) {
     try {
       let saved = task;
       if (isNew) {
@@ -464,18 +710,44 @@
         state.tasks.push(saved);
         toast(`${saved.id} eklendi`);
       } else {
-        await state.store.updateTask(task);
         const i = state.tasks.findIndex((t) => t.id === task.id);
-        state.tasks[i] = task;
+        const prev = base || state.tasks[i];
+        saved = { ...task, ...(await state.store.updateTask(task, state.features.conflicts ? (prev.updatedAt || "") : undefined)) };
+        state.tasks[i] = saved;
         toast(`${task.id} kaydedildi`);
+        if (!prev.done && saved.done && saved.repeat) await spawnNext(saved);
       }
       render();
       return saved;
     } catch (e) {
       console.error(e);
       toast(e.message || String(e), true);
-      render();
+      if (e.conflict) {
+        await load(true);
+        if ($("#taskDialog").open) $("#taskDialog").close();
+      } else {
+        render();
+      }
       return null;
+    }
+  }
+
+  // Tekrar eden görev bitince bir sonraki dönemin görevini oluştur
+  async function spawnNext(t) {
+    const due = shiftByRepeat(t.due || t.doneDate || todayIso(), t.repeat);
+    const assigned = t.assigned ? shiftByRepeat(t.assigned, t.repeat) : todayIso();
+    if (state.tasks.some((x) => x.id !== t.id && x.title === t.title && x.unit === t.unit && x.due === due)) return;
+    const next = {
+      title: t.title, unit: t.unit, priority: t.priority, assigned, due, status: cfg.statuses[0],
+      done: false, doneDate: "", note: t.note || "", repeat: t.repeat, link: t.link || ""
+    };
+    try {
+      const saved = await state.store.addTask(next, state.tasks);
+      state.tasks.push(saved);
+      toast(`Tekrar eden görev: ${saved.id} oluşturuldu (termin ${fmtDate(due)})`);
+    } catch (e) {
+      console.error(e);
+      toast("Sonraki dönemin görevi oluşturulamadı: " + (e.message || e), true);
     }
   }
 
@@ -721,7 +993,7 @@
 
   // ---- Form -------------------------------------------------------------------
 
-  const FORM_FIELDS = ["title", "unit", "priority", "assigned", "due", "status", "doneDate", "note"];
+  const FORM_FIELDS = ["title", "unit", "priority", "assigned", "due", "status", "doneDate", "note", "repeat", "link"];
 
   function openDialog(task) {
     const form = $("#taskForm");
@@ -732,15 +1004,116 @@
     fillSelect(form.status, cfg.statuses);
     const t = task || {
       title: "", unit: $("#unitFilter").value || state.units[0] || "", priority: "Orta",
-      assigned: todayIso(), due: "", status: cfg.statuses[0], doneDate: "", note: ""
+      assigned: todayIso(), due: "", status: cfg.statuses[0], doneDate: "", note: "", repeat: "", link: ""
     };
     for (const f of FORM_FIELDS) form[f].value = t[f] || "";
+    state.dialogBase = task ? { ...task } : null;
     state.pendingSubs = [];
     $("#subTitle").value = "";
     $("#subDue").value = "";
     $("#taskDialog").showModal();
     renderDialogSubs();
+    loadHistory();
     form.title.focus();
+  }
+
+  // ---- Yorumlar ve geçmiş -----------------------------------------------------------
+
+  function fmtStamp(at) {
+    const d = new Date(at);
+    return isNaN(d) ? "" : d.toLocaleString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  }
+
+  function renderHistory(entries) {
+    $("#histCount").textContent = entries.length ? `${entries.filter((h) => h.action === "Yorum").length} yorum · ${entries.length} kayıt` : "";
+    $("#histList").innerHTML = entries.slice().reverse().map((h) => `
+      <li class="${h.action === "Yorum" ? "is-comment" : ""}">
+        <div class="hist-meta"><b>${esc(h.by || "Bilinmeyen")}</b> · ${esc(h.action)}${h.id && h.id !== state.editingId ? ` · ${esc(h.id)}` : ""}<span>${fmtStamp(h.at)}</span></div>
+        ${h.detail ? `<div class="hist-detail">${esc(h.detail)}</div>` : ""}
+      </li>`).join("") || `<li class="sub-empty">Henüz kayıt yok.</li>`;
+  }
+
+  async function loadHistory() {
+    const sec = $("#histSection");
+    sec.hidden = !state.features.history || !state.editingId;
+    if (sec.hidden) return;
+    const id = state.editingId;
+    $("#histList").innerHTML = `<li class="sub-empty">Yükleniyor…</li>`;
+    $("#commentInput").value = "";
+    try {
+      const entries = await state.store.history(id);
+      if (state.editingId === id) { state.history = entries; renderHistory(entries); }
+    } catch (e) {
+      $("#histList").innerHTML = `<li class="sub-empty">Geçmiş yüklenemedi: ${esc(e.message || e)}</li>`;
+    }
+  }
+
+  async function addComment() {
+    const input = $("#commentInput");
+    const text = input.value.trim();
+    if (!text || !state.editingId) { input.focus(); return; }
+    if (!state.actor && !(state.auth && state.auth.account)) { askName(); return; }
+    const btn = $("#commentBtn");
+    btn.disabled = true;
+    try {
+      const entry = await state.store.addComment(state.editingId, text);
+      state.history = [...(state.history || []), entry];
+      renderHistory(state.history);
+      input.value = "";
+    } catch (e) {
+      toast(e.message || String(e), true);
+    } finally {
+      btn.disabled = false;
+      input.focus();
+    }
+  }
+
+  // ---- Rapor: yazdır, CSV, bağlantı ----------------------------------------------------
+
+  function exportCsv() {
+    const rows = filteredTasks();
+    const cols = [["id", "GörevNo"], ["assigned", "AtamaTarihi"], ["unit", "Birim"], ["title", "GörevTanımı"],
+      ["priority", "Öncelik"], ["due", "TerminTarihi"], ["status", "Durum"], ["doneDate", "TamamlanmaTarihi"],
+      ["late", "GecikmeGün"], ["subs", "AltPaket"], ["repeat", "Tekrar"], ["note", "Not"], ["link", "Bağlantı"]];
+    const today = todayIso();
+    const cell = (v) => {
+      const s = String(v ?? "");
+      return /[;"\n\r]/.test(s) || /^[=+\-@]/.test(s) ? `"${(/^[=+\-@]/.test(s) ? "'" : "") + s.replace(/"/g, '""')}"` : s;
+    };
+    const value = (t, k) => {
+      if (k === "assigned" || k === "due" || k === "doneDate") return fmtDate(t[k]);
+      if (k === "late") return isLate(t) ? daysBetween(t.due, today) : t.done && t.due && t.doneDate > t.due ? daysBetween(t.due, t.doneDate) : "";
+      if (k === "subs") { const l = subsOf(t.id); return l.length ? `${l.filter((x) => x.done).length}/${l.length}` : ""; }
+      return t[k];
+    };
+    // Türkçe Excel ; ayırıcı ve BOM ile UTF-8'i doğru açar
+    const csv = "\ufeff" + [cols.map((c) => c[1]).join(";"), ...rows.map((t) => cols.map(([k]) => cell(value(t, k))).join(";"))].join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = `is-takip-${today}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast(`${rows.length} görev CSV olarak indirildi`);
+  }
+
+  function printReport() {
+    // Yazdırmada her zaman liste görünümü kullanılır
+    renderTable(filteredTasks());
+    document.body.classList.add("printing");
+    $("#printDate").textContent = new Date().toLocaleString("tr-TR", { dateStyle: "long", timeStyle: "short" });
+    window.print();
+  }
+
+  async function copyViewLink() {
+    syncUrl();
+    try {
+      await navigator.clipboard.writeText(location.href);
+      toast("Bu görünümün bağlantısı kopyalandı");
+    } catch (_) {
+      window.prompt("Bağlantıyı kopyalayın:", location.href);
+    }
   }
 
   async function submitDialog(ev) {
@@ -749,12 +1122,13 @@
     const base = state.editingId ? state.tasks.find((t) => t.id === state.editingId) : {};
     const task = { ...base };
     for (const f of FORM_FIELDS) task[f] = form[f].value.trim();
+    if (task.link && !safeLink(task.link)) { toast("Bağlantı http:// ya da https:// ile başlamalı.", true); form.link.focus(); return; }
     const final = withStatus(task, task.status);
 
     const btn = form.querySelector("[type=submit]");
     btn.disabled = true;
     const isNew = !state.editingId;
-    const saved = await saveTask(final, isNew);
+    const saved = await saveTask(final, isNew, state.dialogBase);
     if (saved && isNew && state.pendingSubs.length) {
       for (const sub of state.pendingSubs) await addSubFor(saved.id, sub);
       state.expanded.add(saved.id);
@@ -894,19 +1268,64 @@
         if (!item) return;
         const action = e.target.dataset.action;
         if (action === "toggle") return toggleDone(item.dataset.id, e.target);
+        if (e.target.closest("a, select, .card-move")) return;
         if (action === "edit" || (id === "#boardView" && !e.target.closest("input"))) {
           openDialog(state.tasks.find((t) => t.id === item.dataset.id));
         }
       });
     }
 
-    document.querySelector(".seg").addEventListener("click", (e) => {
+    $("#boardView").addEventListener("change", (e) => {
+      if (e.target.dataset.action !== "move") return;
+      const card = e.target.closest("[data-id]");
+      e.target.disabled = true;
+      moveTo(card.dataset.id, e.target.value);
+    });
+
+    document.querySelector(".toolbar .seg").addEventListener("click", (e) => {
       const btn = e.target.closest("[data-view]");
       if (!btn) return;
-      state.view = btn.dataset.view;
-      document.querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("active", b === btn));
+      setView(btn.dataset.view);
       try { localStorage.setItem("istakip-view", state.view); } catch (_) {}
       renderFiltered();
+    });
+
+    $("#ganttView").addEventListener("click", (e) => {
+      const z = e.target.closest("[data-zoom]");
+      if (z) {
+        state.ganttZoom = z.dataset.zoom;
+        try { localStorage.setItem("istakip-gantt", state.ganttZoom); } catch (_) {}
+        return renderFiltered();
+      }
+      if (e.target.closest("[data-gantt=today]")) {
+        const sc = $("#ganttView .g-scroll");
+        if (sc) sc.scrollTo({ left: Math.max(Number(sc.dataset.todayX) - sc.clientWidth / 3, 0), behavior: "smooth" });
+        return;
+      }
+      const row = e.target.closest(".g-row[data-id]");
+      if (row) openDialog(state.tasks.find((t) => t.id === row.dataset.id));
+    });
+
+    $("#exportMenu").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-export]");
+      if (!b) return;
+      $("#exportMenu").open = false;
+      if (b.dataset.export === "csv") exportCsv();
+      if (b.dataset.export === "print") printReport();
+      if (b.dataset.export === "link") copyViewLink();
+    });
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest("#exportMenu")) $("#exportMenu").open = false;
+    });
+    window.addEventListener("afterprint", () => { document.body.classList.remove("printing"); renderFiltered(); });
+
+    $("#commentBtn").addEventListener("click", addComment);
+    $("#commentInput").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addComment(); } });
+    $("#whoBtn").addEventListener("click", askName);
+    $("#nameForm").addEventListener("submit", (e) => {
+      const v = $("#nameInput").value.trim();
+      if (!v) { e.preventDefault(); return; }
+      setActor(v);
     });
 
     $("#newBtn").addEventListener("click", () => openDialog(null));
@@ -920,7 +1339,7 @@
     $("#unitsDialog [data-action=close-units]").addEventListener("click", () => $("#unitsDialog").close());
     $("#taskForm").addEventListener("submit", submitDialog);
     $("#taskForm [data-action=cancel]").addEventListener("click", () => $("#taskDialog").close());
-    $("#refreshBtn").addEventListener("click", load);
+    $("#refreshBtn").addEventListener("click", () => load());
     $("#settingsBtn").addEventListener("click", openSettings);
     document.querySelectorAll("[data-action=settings]").forEach((b) => b.addEventListener("click", openSettings));
     $("#settingsForm").addEventListener("submit", submitSettings);
@@ -1368,13 +1787,17 @@
     $("#demoBtn").addEventListener("click", () => { setDemo(true); start(); });
     $("#lockBtn").addEventListener("click", () => lockNow("Sayfa kilitlendi."));
     startIdleWatch();
+    startAutoRefresh();
     try {
-      const v = localStorage.getItem("istakip-view");
-      if (v === "board" || v === "list") {
-        state.view = v;
-        document.querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("active", b.dataset.view === v));
-      }
+      state.actor = localStorage.getItem(NAME_KEY) || "";
+      const z = localStorage.getItem("istakip-gantt");
+      if (GANTT_ZOOM[z]) state.ganttZoom = z;
+      setView(localStorage.getItem("istakip-view") || "list");
     } catch (_) {}
+    // Bağlantıyla gelen filtreler kayıtlı görünümün önüne geçer
+    state.urlFilters = readUrlFilters();
+    const fromUrl = { pano: "board", zaman: "gantt" }[state.urlFilters.view];
+    if (fromUrl) setView(fromUrl);
     start();
   }
 
