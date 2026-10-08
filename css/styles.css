@@ -609,4 +609,77 @@ label > input, label > select, label > textarea { font-weight: 500; }
   .tasks td.c-title { padding-right: 70px; }
   .due { display: inline-flex; gap: 8px; align-items: center; }
   dialog .grid { grid-template-columns: 1fr; }
+
+  /* Çentikli ekranlarda yan boşluklar */
+  .hero { padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right)); }
+  main { padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right)); padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
+  .hero-body { padding-top: 20px; gap: 16px; }
+  .hero-summary { font-size: 14px; }
+  .hero-ring svg { width: 104px; height: 104px; }
+
+  /* iOS, 16px altı alanlara odaklanınca sayfayı yakınlaştırır */
+  input, select, textarea { font-size: 16px !important; }
+
+  /* Görev satırı: birim, öncelik, termin ve durum tek akışta */
+  .tasks td.c-title { padding-bottom: 6px; }
+  .tasks tr > td:not(.c-done):not(.t-id):not(.c-title):not(.c-act) {
+    display: inline-flex; align-items: center; width: auto; margin: 2px 12px 2px 0; vertical-align: middle;
+  }
+  .tasks tr.sub-row { padding-left: 14px; }
+  .tasks tr.sub-row > td { display: block !important; width: 100% !important; margin: 0 !important; }
+  .tasks tr.sub-row td.c-done { display: none !important; }
+
+  /* Pano: sütunlar yana kaydırılır */
+  .board {
+    display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px;
+    padding: 12px 16px; scroll-padding-inline: 16px; overscroll-behavior-x: contain;
+  }
+  .col { flex: 0 0 min(84%, 320px); scroll-snap-align: start; }
+  .card:hover { transform: none; }
+
+  .panel-head { padding: 12px 14px; }
+  .filters { padding: 12px 14px; }
+  .chip-toggle { flex: 1 1 auto; justify-content: center; }
+  .toolbar #newBtn { margin-left: auto; }
+
+  /* Diyaloglar alttan açılan sayfa gibi */
+  dialog {
+    width: 100%; max-width: 100%; max-height: 92dvh; margin: auto 0 0;
+    border-radius: 18px 18px 0 0; border-bottom: 0; overflow-y: auto; overscroll-behavior: contain;
+  }
+  dialog form, .dlg { padding: 18px 16px 0; }
+  .unit-form { padding: 0 !important; }
+  .dialog-actions {
+    position: sticky; bottom: 0; z-index: 1; flex-wrap: wrap;
+    margin: 20px -16px 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: var(--surface); border-top: 1px solid var(--border);
+  }
+  .dialog-actions .btn { flex: 1 1 auto; justify-content: center; }
+  .dialog-actions .spacer { display: none; }
+  .sub-add-row #subDue { flex: 1 1 140px; }
+
+  .lock-card { padding: 22px 18px; }
+  .empty-state { padding: 48px 16px; }
+}
+
+@media (max-width: 400px) {
+  .top-actions .btn.on-hero { padding: 8px 10px; }
+  .stat-icon { display: none; }
+  .stat { grid-template-columns: 1fr; }
+  .ring-num { font-size: 26px; }
+}
+
+/* Dokunmatik ekranlarda daha büyük dokunma hedefleri */
+@media (pointer: coarse) {
+  .btn { min-height: 42px; }
+  .btn.small { min-height: 36px; padding-inline: 12px; }
+  .seg-btn { min-height: 36px; padding-inline: 18px; }
+  .chip-toggle { min-height: 40px; }
+  .tick { width: 26px; height: 26px; }
+  .tick::after { width: 12px; height: 7px; }
+  .sub-list .tick, dialog .sub-list .tick { width: 22px; height: 22px; }
+  .sub-del { width: 36px; height: 36px; }
+  .sub-progress { min-height: 30px; padding-block: 4px; }
+  .unit-row, .upcoming li, .legend li { min-height: 44px; }
+  .stat:hover, .card:hover { transform: none; }
 }
