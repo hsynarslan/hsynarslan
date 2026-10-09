@@ -13,7 +13,7 @@ window.APP_CONFIG = {
   // Google E-Tablolar web uygulaması adresi (…/exec). Doldurulursa sayfa her cihazda yalnızca
   // E-Tablodaki "İş Takip > 3. Web şifresi belirle" menüsüyle belirlenen şifreyi sorar.
   // Adres tek başına veriye erişim sağlamaz; her istek şifre ya da bağlantı anahtarı gerektirir.
-  sheetsUrl: "",
+  sheetsUrl: "https://script.google.com/macros/s/AKfycbxT3ddcEtcvtX9lns8H5EBtLNF4c-P8iqcOGwSgMutnNFDKAG2g5usMpMdGY0yROhEbDQ/exec",
 
   // Excel dosyasının paylaşım linki (OneDrive / SharePoint > Paylaş > Bağlantıyı kopyala).
   // Boş bırakılabilir: sayfadaki "Ayarlar" penceresinden girilen link tarayıcıda saklanır
