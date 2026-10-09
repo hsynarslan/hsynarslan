@@ -39,7 +39,18 @@ Tarayıcı (index.html)  ──MSAL ile giriş──►  Microsoft Entra ID
   göstergesi ve tek tıkla açılan alt paket listesi
 - **Birim yönetimi:** web'den birim ekleme, düzenleme, silme; birim adı değişince bağlı işler de güncellenir
 - Termini geçmiş işler kırmızı işaretlenir, kaç gün geciktiği yazılır
-- Mobil uyumlu, açık ve koyu tema
+- **Zaman çizelgesi (Gantt):** atama tarihinden termine çubuklar, termin aşımı kırmızı, alt paket terminleri elmas;
+  gün / hafta / ay ölçeği ve bugün çizgisi
+- **Yorumlar ve değişiklik geçmişi:** her görevde kim neyi ne zaman değiştirdi; görev başına yorum
+  (E-Tablodaki **Geçmiş** sayfasında saklanır)
+- **Aynı anda düzenleme koruması:** siz düzenlerken başkası aynı görevi kaydettiyse değişikliğiniz onun üstüne
+  yazılmaz, uyarı çıkar; sayfa açıkken veriler 5 dakikada bir ve sekmeye dönünce kendiliğinden yenilenir
+- **Tekrar eden görevler:** haftalık / aylık / yıllık; görev bitince sonraki dönemin görevi kendiliğinden açılır
+- **Bağlantı alanı:** göreve dosya ya da Drive klasörü bağlantısı
+- **Rapor:** yazdır / PDF, filtrelenmiş listeyi CSV (Excel) olarak indir, zamanında bitirme oranı ve ortalama gecikme
+- **Paylaşılabilir görünüm:** filtreler adres çubuğuna yazılır (ör. `?birim=Bilgi%20İşlem&geciken=1`)
+- **Günlük e-posta:** her sabah 08:45'te bugünün işleri (kurulum: [KURULUM.md](google-sheets/KURULUM.md#günlük-e-posta-her-sabah-0845))
+- Mobil uyumlu, telefonda ana ekrana uygulama olarak eklenebilir (PWA); panoda dokunarak "Taşı"; açık ve koyu tema
 
 ## Hızlı deneme (demo modu)
 
@@ -69,6 +80,10 @@ Hazır şablon: [`sablon/IsTakip.xlsx`](sablon/IsTakip.xlsx). Bunu OneDrive'a ve
 | TamamlandıMı | TRUE / FALSE (Excel'de *Ekle > Onay Kutusu* ile onay kutusuna çevrilebilir) |
 | TamamlanmaTarihi | Tarih |
 | Not | Metin |
+| Tekrar | Boş / Haftalık / Aylık / Yıllık (isteğe bağlı) |
+| Bağlantı | Dosya ya da klasör adresi (isteğe bağlı) |
+| SonGüncelleme | Sayfa yazar; aynı anda düzenleme koruması için (isteğe bağlı) |
+| Güncelleyen | Sayfa yazar (isteğe bağlı) |
 
 **`Birimler` tablosu:** `BirimKodu`, `BirimAdı`, `Sorumlu`, `E-posta`
 

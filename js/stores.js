@@ -14,7 +14,15 @@
     status: "Durum",
     done: "TamamlandıMı",
     doneDate: "TamamlanmaTarihi",
-    note: "Not"
+    note: "Not",
+    repeat: "Tekrar",
+    link: "Bağlantı",
+    updatedAt: "SonGüncelleme",
+    updatedBy: "Güncelleyen"
+  };
+  const FIELD_LABELS = {
+    assigned: "Atama tarihi", unit: "Birim", title: "Tanım", priority: "Öncelik", due: "Termin",
+    status: "Durum", doneDate: "Tamamlanma", note: "Not", repeat: "Tekrar", link: "Bağlantı"
   };
   const DATE_FIELDS = ["assigned", "due", "doneDate"];
   const UNIT_NAME_COLUMN = "BirimAdı";
@@ -60,6 +68,23 @@
     return ["true", "doğru", "dogru", "1", "evet", "x", "✓", "✔"].includes(
       String(v || "").trim().toLocaleLowerCase("tr-TR")
     );
+  }
+
+  // Kayıt sırasında görev başkası tarafından değiştirilmişse fırlatılır.
+  function conflictError(by, at) {
+    const when = at ? new Date(isNaN(Number(at)) ? at : Number(at)) : null;
+    const whenText = when && !isNaN(when) ? " (" + when.toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" }) + ")" : "";
+    const e = new Error(`Bu görev siz düzenlerken ${by || "başka biri"} tarafından değiştirildi${whenText}. ` +
+      "En güncel hali yüklendi; değişikliğinizi tekrar yapın.");
+    e.conflict = true;
+    return e;
+  }
+
+  function changeSummary(old, next) {
+    return Object.keys(FIELD_LABELS)
+      .filter((f) => String(old[f] || "") !== String(next[f] || ""))
+      .map((f) => `${FIELD_LABELS[f]}: ${old[f] || "—"} → ${next[f] || "—"}`)
+      .join("; ");
   }
 
   function nextId(tasks, prefix) {
@@ -127,7 +152,10 @@
 
     get label() { return "Excel (Office 365)"; }
 
-    get features() { return { units: false, subtasks: false }; }
+    get features() {
+      const has = (f) => f in this.colIndex;
+      return { units: false, subtasks: false, conflicts: has("updatedAt"), repeat: has("repeat"), link: has("link") };
+    }
 
     async graph(method, path, body) {
       const token = await this.auth.token();
@@ -234,19 +262,27 @@
     async addTask(task, existing) {
       const base = await this.resolveWorkbook();
       task.id = nextId(existing, this.cfg.idPrefix);
+      task.updatedAt = String(Date.now());
+      task.updatedBy = this.actor || "";
       await this.graph("POST", `${base}/tables/${encodeURIComponent(this.cfg.tasksTable)}/rows`, {
         values: [this.taskToRow(task)]
       });
       return task;
     }
 
-    async updateTask(task) {
+    async updateTask(task, baseStamp) {
       const base = await this.resolveWorkbook();
       // Excel'de satırlar sıralanmış / eklenmiş olabilir; satırı her seferinde GörevNo ile bul.
       const { headers, rows } = await this.readTable(this.cfg.tasksTable);
       this.mapHeaders(headers);
       const index = rows.findIndex((r) => String(r[this.colIndex.id]) === String(task.id));
       if (index < 0) throw new Error(`${task.id} numaralı görev Excel'de bulunamadı.`);
+      if ("updatedAt" in this.colIndex && baseStamp !== undefined) {
+        const current = this.rowToTask(rows[index]);
+        if (String(current.updatedAt || "") !== String(baseStamp || "")) throw conflictError(current.updatedBy, current.updatedAt);
+      }
+      task.updatedAt = String(Date.now());
+      task.updatedBy = this.actor || "";
       await this.graph(
         "PATCH",
         `${base}/tables/${encodeURIComponent(this.cfg.tasksTable)}/rows/itemAt(index=${index})`,
@@ -259,12 +295,16 @@
   // ---- Google E-Tablolar deposu (Apps Script web uygulaması) -------------------
 
   class SheetsStore {
-    constructor(url, token) { this.url = url; this.token = token; this.version = 0; }
+    constructor(url, token) { this.url = url; this.token = token; this.version = 0; this.actor = ""; }
 
     get label() { return "Google E-Tablolar"; }
 
     // Birim yönetimi ve alt paketler Kod.gs'in 2. sürümüyle gelir.
-    get features() { return { units: this.version >= 2, subtasks: this.version >= 2, needsUpdate: this.version < 2 }; }
+    // 4. sürüm: geçmiş, yorumlar, aynı anda düzenleme koruması, tekrar ve bağlantı sütunları.
+    get features() {
+      const v4 = this.version >= 4;
+      return { units: this.version >= 2, subtasks: this.version >= 2, history: v4, conflicts: v4, repeat: v4, link: v4, needsUpdate: !v4 };
+    }
 
     async request(init, query) {
       let res;
@@ -279,12 +319,17 @@
       } catch (_) {
         throw new Error("Google'dan beklenmeyen yanıt geldi. Dağıtımda \"Erişimi olanlar: Herkes\" seçili olmalı ve adres /exec ile bitmeli.");
       }
-      if (!data.ok) throw new Error(data.error || "Google E-Tablolar isteği başarısız oldu.");
+      if (!data.ok) {
+        const msg = String(data.error || "");
+        if (msg.startsWith("CONFLICT|")) { const [, by, at] = msg.split("|"); throw conflictError(by, at); }
+        throw new Error(msg || "Google E-Tablolar isteği başarısız oldu.");
+      }
       return data;
     }
 
     async load() {
-      const data = await this.request({ method: "GET" }, "?action=load&token=" + encodeURIComponent(this.token));
+      const data = await this.request({ method: "GET" }, "?action=load&token=" + encodeURIComponent(this.token) +
+        "&page=" + encodeURIComponent(location.origin + location.pathname));
       this.version = data.version || 1;
       const tasks = data.tasks || [];
       let units = data.units || [];
@@ -299,7 +344,7 @@
       return this.request({
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ token: this.token, ...body })
+        body: JSON.stringify({ token: this.token, actor: this.actor, ...body })
       });
     }
 
@@ -308,10 +353,14 @@
       return data.task;
     }
 
-    async updateTask(task) {
-      await this.post({ action: "update", task });
-      return task;
+    async updateTask(task, base) {
+      const data = await this.post({ action: "update", task, base: this.version >= 4 ? (base || "") : undefined });
+      return data.task || task;
     }
+
+    async history(id) { return (await this.post({ action: "history", id })).entries || []; }
+
+    async addComment(id, text) { return (await this.post({ action: "comment", id, text })).entry; }
 
     async saveUnit(oldName, unit) {
       const data = await this.post({ action: "unitSave", oldName: oldName || "", unit });
@@ -329,7 +378,7 @@
 
   // ---- Demo deposu (localStorage) -------------------------------------------
 
-  const DEMO_KEY = "istakip-demo-v2";
+  const DEMO_KEY = "istakip-demo-v3";
 
   function daysFromToday(n) {
     const d = new Date();
@@ -365,7 +414,10 @@
       status,
       done: status === "Tamamlandı",
       doneDate: status === "Tamamlandı" ? daysFromToday(d - 1) : "",
-      note: ""
+      note: "",
+      repeat: i === 13 ? "Yıllık" : i === 11 ? "Aylık" : "",
+      link: i === 0 ? "https://drive.google.com/" : "",
+      updatedAt: "", updatedBy: ""
     }));
     const subs = [
       ["G-0001", "Teknik şartnamenin hazırlanması", true],
@@ -378,7 +430,11 @@
       id: `${taskId}.${arr.slice(0, i).filter((x) => x[0] === taskId).length + 1}`,
       taskId, title, due: "", done, doneDate: done ? daysFromToday(-2) : ""
     }));
-    return { tasks, units, unitInfo: units.map((name) => ({ name, owner: "", email: "" })), subs };
+    const history = [
+      { at: new Date(Date.now() - 3 * 86400000).toISOString(), by: "Ayşe K.", id: "G-0001", action: "Güncellendi", detail: "Durum: Atandı → Devam Ediyor" },
+      { at: new Date(Date.now() - 86400000).toISOString(), by: "Mehmet T.", id: "G-0001", action: "Yorum", detail: "Şartname taslağı Drive klasörüne yüklendi, onaya gönderildi." }
+    ];
+    return { tasks, units, unitInfo: units.map((name) => ({ name, owner: "", email: "" })), subs, history };
   }
 
   class DemoStore {
@@ -386,7 +442,26 @@
 
     get label() { return "Demo (tarayıcı belleği)"; }
 
-    get features() { return { units: true, subtasks: true }; }
+    get features() { return { units: true, subtasks: true, history: true, conflicts: true, repeat: true, link: true }; }
+
+    log(id, action, detail) {
+      const entry = { at: new Date().toISOString(), by: this.actor || "", id: id || "", action, detail: detail || "" };
+      this.data.history.push(entry);
+      if (this.data.history.length > 500) this.data.history.splice(0, this.data.history.length - 500);
+      return entry;
+    }
+
+    async history(id) {
+      return this.data.history.filter((h) => h.id === id || h.id.startsWith(id + ".")).map((h) => ({ ...h }));
+    }
+
+    async addComment(id, text) {
+      text = String(text || "").trim();
+      if (!text) throw new Error("Yorum boş olamaz.");
+      const e = this.log(id, "Yorum", text);
+      this.persist();
+      return { ...e };
+    }
 
     persist() {
       try { localStorage.setItem(DEMO_KEY, JSON.stringify(this.data)); } catch (_) {}
@@ -400,20 +475,33 @@
       if (!this.data) { this.data = demoSeed(); this.persist(); }
       if (!this.data.unitInfo) this.data.unitInfo = this.data.units.map((name) => ({ name, owner: "", email: "" }));
       if (!this.data.subs) this.data.subs = demoSeed().subs;
-      return JSON.parse(JSON.stringify(this.data));
+      if (!this.data.history) this.data.history = [];
+      const copy = JSON.parse(JSON.stringify(this.data));
+      delete copy.history;
+      return copy;
     }
 
     async addTask(task) {
       task.id = nextId(this.data.tasks, this.cfg.idPrefix);
+      task.updatedAt = new Date().toISOString();
+      task.updatedBy = this.actor || "";
       this.data.tasks.push({ ...task });
+      this.log(task.id, "Oluşturuldu", task.title);
       this.persist();
       return task;
     }
 
-    async updateTask(task) {
+    async updateTask(task, base) {
+      // Başka sekmede yapılan değişiklikleri görmek için kayıttan önce güncel veriyi oku
+      try { const raw = localStorage.getItem(DEMO_KEY); if (raw) this.data = { history: [], ...JSON.parse(raw) }; } catch (_) {}
       const i = this.data.tasks.findIndex((t) => t.id === task.id);
       if (i < 0) throw new Error(`${task.id} bulunamadı.`);
+      const old = this.data.tasks[i];
+      if (base !== undefined && String(base || "") !== String(old.updatedAt || "")) throw conflictError(old.updatedBy, old.updatedAt);
+      task = { ...task, updatedAt: new Date().toISOString(), updatedBy: this.actor || "" };
       this.data.tasks[i] = { ...task };
+      const changes = changeSummary(old, task);
+      if (changes) this.log(task.id, old.done !== task.done ? (task.done ? "Tamamlandı" : "Yeniden açıldı") : "Güncellendi", changes);
       this.persist();
       return task;
     }
@@ -454,6 +542,7 @@
         .reduce((m, x) => Math.max(m, parseInt(String(x.id).split(".").pop(), 10) || 0), 0);
       const saved = { ...sub, title, id: `${sub.taskId}.${max + 1}` };
       this.data.subs.push(saved);
+      this.log(saved.id, "Alt paket eklendi", title);
       this.persist();
       return { ...saved };
     }
@@ -461,13 +550,16 @@
     async updateSub(sub) {
       const i = this.data.subs.findIndex((x) => x.id === sub.id);
       if (i < 0) throw new Error(`${sub.id} bulunamadı.`);
+      if (!!this.data.subs[i].done !== !!sub.done) this.log(sub.id, sub.done ? "Alt paket tamamlandı" : "Alt paket yeniden açıldı", sub.title);
       this.data.subs[i] = { ...sub };
       this.persist();
       return sub;
     }
 
     async deleteSub(id) {
-      this.data.subs = this.data.subs.filter((x) => x.id !== id);
+      const x = this.data.subs.find((y) => y.id === id);
+      this.data.subs = this.data.subs.filter((y) => y.id !== id);
+      if (x) this.log(id, "Alt paket silindi", x.title);
       this.persist();
     }
 

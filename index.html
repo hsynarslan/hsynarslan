@@ -4,6 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>İş Takip</title>
+  <meta name="theme-color" content="#0e2a3f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="İş Takip">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap">
@@ -25,6 +33,10 @@
         <div class="top-actions">
           <span id="modeBadge" class="badge"></span>
           <span id="userName" class="user"></span>
+          <button id="whoBtn" class="btn on-hero" hidden title="Adınızı değiştirin">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21a8 8 0 0 1 16 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span id="whoName"></span>
+          </button>
           <button id="refreshBtn" class="btn on-hero" title="Excel'den yeniden yükle">
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Yenile
@@ -102,6 +114,7 @@
     </section>
 
     <section id="appView" hidden>
+      <p class="print-only print-head">İş Takip raporu · <span id="printDate"></span></p>
       <div id="demoBanner" class="demo-banner" hidden>
         <div>
           <b>Örnek verilerle çalışıyorsunuz.</b>
@@ -112,7 +125,7 @@
       <div id="updateBanner" class="demo-banner warn" hidden>
         <div>
           <b>Google tarafındaki kodu güncelleyin.</b>
-          <span>Birim yönetimi ve alt paketler için E-Tablodaki Apps Script kodunun yeni sürümü gerekiyor.</span>
+          <span>Değişiklik geçmişi, yorumlar, aynı anda düzenleme koruması, tekrar eden görevler ve günlük e-posta için E-Tablodaki Apps Script kodunun yeni sürümü gerekiyor.</span>
         </div>
         <a class="btn" href="https://github.com/hsynarslan/hsynarslan/blob/main/google-sheets/KURULUM.md#kodu-g%C3%BCncellemek-gerekirse" target="_blank" rel="noopener">Nasıl güncellenir?</a>
       </div>
@@ -150,12 +163,26 @@
             <div class="seg" role="tablist" aria-label="Görünüm">
               <button id="viewList" class="seg-btn active" data-view="list" role="tab">Liste</button>
               <button id="viewBoard" class="seg-btn" data-view="board" role="tab">Pano</button>
+              <button id="viewGantt" class="seg-btn" data-view="gantt" role="tab">Zaman</button>
             </div>
           </div>
-          <button id="newBtn" class="btn primary">
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
-            Yeni görev
-          </button>
+          <div class="toolbar-right">
+            <details class="menu" id="exportMenu">
+              <summary class="btn">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Rapor
+              </summary>
+              <div class="menu-list" role="menu">
+                <button type="button" role="menuitem" data-export="print">Yazdır / PDF olarak kaydet</button>
+                <button type="button" role="menuitem" data-export="csv">Listeyi CSV (Excel) indir</button>
+                <button type="button" role="menuitem" data-export="link">Bu görünümün bağlantısını kopyala</button>
+              </div>
+            </details>
+            <button id="newBtn" class="btn primary">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+              Yeni görev
+            </button>
+          </div>
         </div>
         <div class="filters">
           <input id="search" type="search" placeholder="Ara: görev, not, no…" aria-label="Ara">
@@ -185,6 +212,7 @@
         </div>
 
         <div id="boardView" class="board" hidden></div>
+        <div id="ganttView" class="gantt" hidden></div>
         <p id="noRows" class="no-rows" hidden>Filtreye uyan görev yok.</p>
       </div>
     </section>
@@ -223,7 +251,19 @@
         <label class="full">Not
           <textarea name="note" rows="2"></textarea>
         </label>
+        <label data-feature="repeat">Tekrar
+          <select name="repeat">
+            <option value="">Tekrar etmez</option>
+            <option>Haftalık</option>
+            <option>Aylık</option>
+            <option>Yıllık</option>
+          </select>
+        </label>
+        <label data-feature="link">Bağlantı (dosya, Drive klasörü…)
+          <input name="link" type="url" placeholder="https://…" inputmode="url">
+        </label>
       </div>
+      <p class="form-help repeat-help" data-feature="repeat">Tekrar eden bir görev tamamlandığında bir sonraki dönemin görevi kendiliğinden oluşturulur.</p>
       <section id="subsSection" class="subs-edit" hidden>
         <div class="subs-head">
           <h3>Alt paketler</h3>
@@ -236,8 +276,34 @@
           <button type="button" id="subAddBtn" class="btn small">Ekle</button>
         </div>
       </section>
+      <section id="histSection" class="hist" hidden>
+        <div class="subs-head">
+          <h3>Yorumlar ve geçmiş</h3>
+          <span id="histCount" class="subs-count"></span>
+        </div>
+        <div class="sub-add-row">
+          <input id="commentInput" type="text" placeholder="Yorum yazın…" aria-label="Yorum" maxlength="2000">
+          <button type="button" id="commentBtn" class="btn small">Gönder</button>
+        </div>
+        <ol id="histList" class="hist-list"></ol>
+      </section>
       <div class="dialog-actions">
         <button type="button" class="btn ghost" data-action="cancel">Vazgeç</button>
+        <button type="submit" class="btn primary">Kaydet</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="nameDialog">
+    <form id="nameForm" method="dialog">
+      <h2>Adınız</h2>
+      <p class="form-help">Yaptığınız değişiklikler ve yorumlar bu adla kaydedilir. Ad yalnızca bu cihazda saklanır.</p>
+      <div class="settings-fields">
+        <label>Ad soyad
+          <input id="nameInput" type="text" required maxlength="60" autocomplete="name">
+        </label>
+      </div>
+      <div class="dialog-actions">
         <button type="submit" class="btn primary">Kaydet</button>
       </div>
     </form>
