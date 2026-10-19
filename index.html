@@ -258,6 +258,10 @@
         <label data-feature="times">Bitiş saati
           <input name="endTime" type="time" step="300">
         </label>
+        <div class="full cal-row" data-feature="calendar">
+          <label class="chip-toggle"><input id="calInput" type="checkbox"> Takvime ekle (Outlook'a davet gönder)</label>
+          <span id="calState" class="cal-state"></span>
+        </div>
         <label>Durum
           <select name="status"></select>
         </label>
@@ -352,9 +356,13 @@
         Acil iş olmayan günlerde de "Bugün için acil iş yok" e-postası gönderilir.</p>
       <div id="emailState" class="email-state"></div>
       <div class="settings-fields">
+        <label>Alıcı e-posta adresi
+          <input id="emailTo" type="text" inputmode="email" autocomplete="email" placeholder="ad.soyad@kurum.edu.tr (birden fazlaysa virgülle ayırın)">
+        </label>
         <label>Gönderim saati
           <select id="emailTime"></select>
         </label>
+        <label class="chip-toggle"><input id="emailCal" type="checkbox"> Bugünün saatli işleri için her sabah takvim daveti gönder (Outlook)</label>
         <label class="chip-toggle"><input id="emailUnits" type="checkbox"> Birim sorumlularına da kendi birimlerinin işlerini gönder</label>
       </div>
       <p id="emailError" class="form-error" role="alert" hidden></p>

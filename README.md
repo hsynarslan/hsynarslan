@@ -41,6 +41,8 @@ Tarayıcı (index.html)  ──MSAL ile giriş──►  Microsoft Entra ID
   **Gün** görünümünde saat saat çizelge (şimdiki saat vurgulu, günler arasında gezinme)
 - **Günün açılış penceresi:** her girişte gecikenler ve bugün yapılacaklar; onay kutusuyla tek tıkla tamamlama
 - **Günlük e-posta:** siteden aç/kapat, saat seçimi, deneme gönderimi, son gönderim ve hata durumu
+- **Outlook takvimi:** görev penceresinde "Takvime ekle" seçeneği; Google Takvim üzerinden alıcıya davet gider,
+  "Kabul et" ile Outlook takvimine eklenir; saat değişince yeni davet, iptal edilince silinir
 - **Birim yönetimi:** web'den birim ekleme, düzenleme, silme; birim adı değişince bağlı işler de güncellenir
 - Termini geçmiş işler kırmızı işaretlenir, kaç gün geciktiği yazılır
 - **Zaman çizelgesi (Gantt):** atama tarihinden termine çubuklar, termin aşımı kırmızı, alt paket terminleri elmas;

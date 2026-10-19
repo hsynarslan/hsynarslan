@@ -924,3 +924,9 @@ label > input, label > select, label > textarea { font-weight: 500; }
 
 /* Pencere içindeki seçim kutuları (ör. e-posta: birim sorumluları) satır içinde dursun */
 dialog label.chip-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; justify-self: start; }
+
+/* Takvim (Outlook daveti) */
+.cal-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cal-state { color: var(--muted); font-size: 12px; font-weight: 500; }
+.t-cal { display: inline-flex; align-items: center; margin-left: 6px; color: var(--primary); vertical-align: -1px; }
+dialog .grid > .full { grid-column: 1 / -1; }

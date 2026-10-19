@@ -130,6 +130,10 @@
     return url ? `<a class="t-link" href="${esc(url)}" target="_blank" rel="noopener" title="Bağlantıyı aç" aria-label="Bağlantıyı aç"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></a>` : "";
   }
 
+  function calHtml(t) {
+    return t.calEvent ? `<span class="t-cal" title="Takvime eklendi (davet gönderildi)" aria-label="Takvime eklendi"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 10h16M9 3v4M15 3v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>` : "";
+  }
+
   function repeatHtml(t) {
     return t.repeat ? `<span class="t-repeat" title="${esc(t.repeat)} tekrar eder"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(t.repeat)}</span>` : "";
   }
@@ -460,7 +464,7 @@
       <tr class="${t.done ? "is-done" : ""} ${isLate(t) ? "is-late" : ""}" data-id="${esc(t.id)}">
         <td class="c-done"><input class="tick" type="checkbox" data-action="toggle" ${t.done ? "checked" : ""} aria-label="${esc(t.id)} tamamlandı"></td>
         <td class="t-id">${esc(t.id)}</td>
-        <td class="c-title"><div class="t-title">${esc(t.title)}${linkHtml(t)}${repeatHtml(t)}</div>${t.note ? `<div class="t-note">${esc(t.note)}</div>` : ""}${subProgressHtml(t, true)}</td>
+        <td class="c-title"><div class="t-title">${esc(t.title)}${linkHtml(t)}${calHtml(t)}${repeatHtml(t)}</div>${t.note ? `<div class="t-note">${esc(t.note)}</div>` : ""}${subProgressHtml(t, true)}</td>
         <td><span class="unit-cell">${avatar(t.unit, true)}${esc(t.unit)}</span></td>
         <td>${prioHtml(t.priority)}</td>
         <td>${dueHtml(t)}</td>
@@ -496,7 +500,7 @@
           return `<article class="card ${t.done ? "is-done" : ""} ${isLate(t) ? "is-late" : ""}" draggable="true" data-id="${esc(t.id)}">
             <div class="card-top">
               <input class="tick" type="checkbox" data-action="toggle" ${t.done ? "checked" : ""} aria-label="${esc(t.id)} tamamlandı">
-              <div class="card-title">${esc(t.title)}${linkHtml(t)}${repeatHtml(t)}${subProgressHtml(t, false) ? `<div>${subProgressHtml(t, false)}</div>` : ""}</div>
+              <div class="card-title">${esc(t.title)}${linkHtml(t)}${calHtml(t)}${repeatHtml(t)}${subProgressHtml(t, false) ? `<div>${subProgressHtml(t, false)}</div>` : ""}</div>
             </div>
             <div class="card-foot">
               <span class="unit-cell">${avatar(t.unit, true)}${esc(t.unit)}</span>
@@ -616,7 +620,7 @@
     return `<div class="ag-item ${t.done ? "is-done" : ""} ${isLate(t) ? "is-late" : ""}" data-id="${esc(t.id)}">
       <input class="tick" type="checkbox" data-action="toggle" ${t.done ? "checked" : ""} aria-label="${esc(t.title)} tamamlandı">
       <div class="ag-main">
-        <div class="ag-title">${esc(t.title)}${linkHtml(t)}</div>
+        <div class="ag-title">${esc(t.title)}${linkHtml(t)}${calHtml(t)}</div>
         <div class="ag-meta">
           ${tr ? `<span class="t-time">${esc(tr)}</span>` : ""}
           <span class="unit-cell">${avatar(t.unit, true)}${esc(t.unit)}</span>
@@ -769,6 +773,11 @@
       ${typeof st.quota === "number" ? `<div class="email-row"><span>Bugün kalan gönderim hakkı</span><b>${st.quota}</b></div>` : ""}`;
     $("#emailTime").value = st.time;
     $("#emailUnits").checked = !!st.unitEmails;
+    $("#emailTo").value = st.toSetting || "";
+    $("#emailTo").placeholder = st.owner ? `Boş bırakılırsa: ${st.owner}` : $("#emailTo").placeholder;
+    $("#emailCal").checked = !!st.calendar;
+    $("#emailCal").closest("label").hidden = !state.features.calendar;
+    state.emailTo = st.to;
     $("#emailOffBtn").hidden = !st.enabled;
     $("#emailOnBtn").textContent = st.enabled ? "Ayarları kaydet" : "Aç ve kaydet";
   }
@@ -948,6 +957,12 @@
         toast(`${task.id} kaydedildi`);
         if (!prev.done && saved.done && saved.repeat) await spawnNext(saved);
       }
+      if (saved.calendarError) toast(saved.calendarError, true);
+      else if (saved.calendarInvited === "noguest") toast("Etkinlik Google Takvim'inize eklendi. Outlook'a davet gitmesi için E-posta penceresinden alıcı adresini girin.", true);
+      else if (saved.calendarInvited) toast(`${saved.id} takvime eklendi; davet ${state.emailTo || "alıcı adresine"} gönderildi. Outlook'ta "Kabul et" deyin.`);
+      delete saved.calendarError;
+      delete saved.calendarInvited;
+      delete saved.calendar;
       render();
       return saved;
     } catch (e) {
@@ -1240,6 +1255,9 @@
     };
     for (const f of FORM_FIELDS) form[f].value = t[f] || "";
     state.dialogBase = task ? { ...task } : null;
+    const calRemember = (() => { try { return localStorage.getItem("istakip-takvim") === "1"; } catch (_) { return false; } })();
+    $("#calInput").checked = task ? !!task.calEvent : calRemember;
+    $("#calState").textContent = task && task.calEvent ? "Takvimde var. Saat değişirse yeni davet gider; kutuyu kaldırırsanız takvimden silinir." : "";
     state.pendingSubs = [];
     $("#subTitle").value = "";
     $("#subDue").value = "";
@@ -1360,6 +1378,11 @@
     }
     // Saat girilip tarih boş bırakıldıysa iş bugüne planlanmış sayılır
     if ((task.startTime || task.endTime) && !task.due) task.due = todayIso();
+    if (state.features.calendar) {
+      task.calendar = $("#calInput").checked;
+      if (task.calendar && !task.due) { toast("Takvime eklemek için termin tarihi girin.", true); form.due.focus(); return; }
+      if (!state.editingId) { try { localStorage.setItem("istakip-takvim", task.calendar ? "1" : "0"); } catch (_) {} }
+    }
     const final = withStatus(task, task.status);
 
     const btn = form.querySelector("[type=submit]");
@@ -1538,7 +1561,8 @@
     $("#emailBtn").addEventListener("click", openEmail);
     $("#emailForm").addEventListener("submit", (e) => {
       e.preventDefault();
-      emailAction(() => state.store.emailEnable($("#emailTime").value, $("#emailUnits").checked), $("#emailOnBtn"), "Kaydediliyor…",
+      emailAction(() => state.store.emailEnable($("#emailTime").value, $("#emailUnits").checked, $("#emailTo").value.trim(),
+        state.features.calendar ? $("#emailCal").checked : undefined), $("#emailOnBtn"), "Kaydediliyor…",
         (st) => `Günlük e-posta açık: her gün ${st.time} civarında ${st.to} adresine gönderilecek`);
     });
     $("#emailOffBtn").addEventListener("click", () =>

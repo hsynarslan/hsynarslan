@@ -20,7 +20,8 @@
     updatedAt: "SonGüncelleme",
     updatedBy: "Güncelleyen",
     startTime: "BaşlangıçSaati",
-    endTime: "BitişSaati"
+    endTime: "BitişSaati",
+    calEvent: "TakvimEtkinliği"
   };
   const FIELD_LABELS = {
     assigned: "Atama tarihi", unit: "Birim", title: "Tanım", priority: "Öncelik", due: "Termin",
@@ -305,10 +306,10 @@
     // Birim yönetimi ve alt paketler Kod.gs'in 2. sürümüyle gelir.
     // 4. sürüm: geçmiş, yorumlar, aynı anda düzenleme koruması, tekrar ve bağlantı sütunları.
     get features() {
-      const v4 = this.version >= 4, v5 = this.version >= 5;
+      const v4 = this.version >= 4, v5 = this.version >= 5, v6 = this.version >= 6;
       return {
         units: this.version >= 2, subtasks: this.version >= 2, history: v4, conflicts: v4, repeat: v4, link: v4,
-        times: v5, email: v5, needsUpdate: !v5
+        times: v5, email: v5, calendar: v6, needsUpdate: !v6
       };
     }
 
@@ -387,7 +388,7 @@
         return (await this.post(body)).email;
       } catch (e) {
         // Yeni e-posta/zamanlayıcı izni henüz verilmediyse Google bu türden bir hata döndürür
-        if (/permission|authoriz|yetki|izin|ScriptApp|MailApp/i.test(e.message || "")) {
+        if (/permission|authoriz|yetki|izin|ScriptApp|MailApp|CalendarApp/i.test(e.message || "")) {
           throw new Error("Google, e-posta göndermek için sizden bir kez izin istiyor. E-Tabloda İş Takip > \"Günlük e-postayı şimdi gönder (deneme)\" menüsünü çalıştırıp izin verin, sonra burada yeniden deneyin.");
         }
         throw e;
@@ -395,7 +396,7 @@
     }
 
     emailStatus() { return this.emailCall({ action: "emailStatus" }); }
-    emailEnable(time, unitEmails) { return this.emailCall({ action: "emailEnable", time, unitEmails }); }
+    emailEnable(time, unitEmails, to, calendar) { return this.emailCall({ action: "emailEnable", time, unitEmails, to, calendar }); }
     emailDisable() { return this.emailCall({ action: "emailDisable" }); }
     emailTest() { return this.emailCall({ action: "emailTest" }); }
   }

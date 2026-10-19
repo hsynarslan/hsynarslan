@@ -112,7 +112,7 @@ Güvenlik:
 Sayfada **"Google tarafındaki kodu güncelleyin"** uyarısı görüyorsanız E-Tablodaki köprü kodunun yeni sürümü
 gerekiyor. Örneğin birim yönetimi ve alt paketler 2. sürümle; değişiklik geçmişi, yorumlar, aynı anda düzenleme
 koruması, tekrar eden görevler ve günlük e-posta 4. sürümle; saatlik takip (başlangıç/bitiş saati) ve siteden
-e-posta yönetimi 5. sürümle geldi. Verileriniz silinmez; yaklaşık 3 dakika sürer.
+e-posta yönetimi 5. sürümle; alıcı adresi ve Outlook takvim davetleri 6. sürümle geldi. Verileriniz silinmez; yaklaşık 3 dakika sürer.
 
 1. E-Tablonuzu açın ve **Uzantılar → Apps Script** yolunu izleyin.
 2. Kod alanındaki her şeyi silin (Ctrl+A, ardından Delete).
@@ -124,7 +124,7 @@ e-posta yönetimi 5. sürümle geldi. Verileriniz silinmez; yaklaşık 3 dakika 
    Yeniden izin isterse 3. adımdaki gibi onaylayın.
 7. E-Tablo sekmesine dönüp sayfayı yenileyin ve **İş Takip → 1. Kurulumu yap** menüsünü bir kez çalıştırın.
    Bu adım yeni sayfaları (ör. **AltGörevler**, **Geçmiş**) oluşturur ve **Görevler** sayfasının sonuna eksik
-   sütunları (**Tekrar**, **Bağlantı**, **SonGüncelleme**, **Güncelleyen**, **BaşlangıçSaati**, **BitişSaati**)
+   sütunları (**Tekrar**, **Bağlantı**, **SonGüncelleme**, **Güncelleyen**, **BaşlangıçSaati**, **BitişSaati**, **TakvimEtkinliği**)
    ekler; mevcut görevlerinize ve anahtarınıza dokunmaz. (5. sürümden itibaren eksik sütunlar ilk kullanımda
    kendiliğinden de eklenir.)
 8. İş Takip sayfasını yenileyin. Uyarı kaybolur.
@@ -138,16 +138,31 @@ E-Tablo her sabah size **bugün yapılması gerekenleri** e-postayla gönderir: 
 (saatleriyle), bugünkü ve geciken alt paketler, ayrıca önümüzdeki 3 günün işleri. Acil iş olmayan günlerde de
 "Bugün için acil iş yok" e-postası gelir. E-posta, E-Tablonun sahibi olan Google hesabından yine o hesaba gider.
 
-**Siteden yönetim (önerilen, 5. sürüm):** Sayfanın üstündeki **E-posta** düğmesi.
-- Durumu (açık/kapalı), alıcıyı, **son gönderimi** ve varsa **hatanın ne olduğunu** gösterir.
+**Siteden yönetim (önerilen):** Sayfanın üstündeki **E-posta** düğmesi.
+- **Alıcı e-posta adresi:** E-postanın (ve takvim davetlerinin) gideceği adres, ör. iş adresiniz.
+  Birden fazla adres virgülle yazılabilir. Boş bırakılırsa E-Tablonun sahibi olan Google hesabına gider.
+- Durumu (açık/kapalı), **son gönderimi** ve varsa **hatanın ne olduğunu** gösterir.
 - **Gönderim saati** seçilir (15 dakikalık aralıklarla), **Aç ve kaydet** ile açılır.
 - **Deneme e-postası gönder** ile hemen bir e-posta gönderilir.
+- **Bugünün saatli işleri için takvim daveti gönder:** işaretlenirse sabah e-postasıyla birlikte, bugünün saatli
+  işleri için (henüz takvimde değilse) alıcıya takvim daveti gider.
 - İsterseniz birim sorumlularına da (Birimler sayfasındaki **E-posta** sütunu) kendi birimlerinin işleri gider.
+
+## Outlook takvimine ekleme
+
+Görev penceresindeki **Takvime ekle (Outlook'a davet gönder)** işaretlenirse görev kaydedilirken:
+- E-Tablo sahibinin Google Takvim'inde bir etkinlik oluşturulur ve **alıcı adresine davet** gönderilir.
+- Davet e-postasında **Kabul et** dediğinizde etkinlik **Outlook takviminize** eklenir.
+- Saatli işler o saatlerde (yalnızca başlangıç varsa 1 saatlik), saatsiz işler **tüm gün** etkinliği olarak eklenir.
+- Saat ya da tarih değişirse yeni davet gider; kutuyu kaldırırsanız ya da iş **İptal** edilirse etkinlik silinir.
+  (Google eski davetin iptalini her zaman Outlook'a iletmeyebilir; gerekirse eski etkinliği Outlook'ta silin.)
+- Listede takvime eklenen işlerin yanında küçük bir takvim simgesi görünür.
 
 **İlk seferde izin gerekir:** Google, e-posta göndermek ve her sabah çalışmak için sizden bir kez izin ister.
 Sitede *"Google, e-posta göndermek için sizden bir kez izin istiyor"* uyarısı görürseniz:
 1. E-Tabloda **İş Takip → Günlük e-postayı şimdi gönder (deneme)** menüsünü çalıştırın.
 2. Açılan izin ekranında 3. adımdaki gibi onaylayın (**Gelişmiş → … sayfasına git → İzin ver**).
+   Takvim davetleri için Google Takvim izni de bu ekranda istenir.
 3. Size bir deneme e-postası gelir. Ardından sitede **E-posta → Aç ve kaydet** deyin.
 
 Notlar:

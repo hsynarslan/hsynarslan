@@ -12,7 +12,7 @@ const SHEET_SUBS = "AltGörevler";
 const SHEET_LOG = "Geçmiş";
 
 // Web sayfası bu numaraya bakarak hangi özelliklerin desteklendiğini anlar.
-const API_VERSION = 5;
+const API_VERSION = 6;
 
 // Günlük e-posta: varsayılan gönderim saati (siteden değiştirilebilir; Google ±15 dakika esneklikle çalıştırır)
 const EMAIL_DEFAULT_TIME = "08:45";
@@ -40,10 +40,11 @@ const COLUMNS = {
   updatedAt: "SonGüncelleme",
   updatedBy: "Güncelleyen",
   startTime: "BaşlangıçSaati",
-  endTime: "BitişSaati"
+  endTime: "BitişSaati",
+  calEvent: "TakvimEtkinliği"
 };
 // Sonradan eklenen sütunlar: eski tablolarda yoksa ilk kullanımda otomatik olarak sona eklenir.
-const OPTIONAL_COLUMNS = ["repeat", "link", "updatedAt", "updatedBy", "startTime", "endTime"];
+const OPTIONAL_COLUMNS = ["repeat", "link", "updatedAt", "updatedBy", "startTime", "endTime", "calEvent"];
 const TIME_FIELDS = ["startTime", "endTime"];
 const LOG_COLUMNS = ["Tarih", "Kişi", "GörevNo", "İşlem", "Ayrıntı"];
 const FIELD_LABELS = {
@@ -253,7 +254,7 @@ function doPost(e) {
         case "history": return { ok: true, entries: readLog_(body.id) };
         case "comment": return { ok: true, entry: addComment_(body.id, body.text, actor) };
         case "emailStatus": return { ok: true, email: emailStatus_() };
-        case "emailEnable": enableDigest_(body.time, body.unitEmails); return { ok: true, email: emailStatus_() };
+        case "emailEnable": enableDigest_(body.time, body.unitEmails, body.to, body.calendar); return { ok: true, email: emailStatus_() };
         case "emailDisable": removeDigestTriggers_(); return { ok: true, email: emailStatus_() };
         case "emailTest": return { ok: true, sent: gunlukEpostaGonder(true), email: emailStatus_() };
         default: throw new Error("Bilinmeyen işlem: " + body.action);
@@ -435,6 +436,7 @@ function toCell_(field, v) {
   // Baştaki kesme işareti E-Tablonun zaman damgasını ve saati tarihe/saate çevirmesini engeller
   if (field === "updatedAt") return v ? "'" + String(v) : "";
   if (TIME_FIELDS.indexOf(field) >= 0) { const t = normalizeTime_(v); return t ? "'" + t : ""; }
+  if (field === "calEvent") return v ? "'" + String(v) : "";
   return v === null || v === undefined ? "" : String(v);
 }
 
@@ -634,8 +636,12 @@ function addTask_(task, actor) {
   const saved = Object.assign({}, task, {
     id: ID_PREFIX + ("000" + (max + 1)).slice(-4), updatedAt: new Date().toISOString(), updatedBy: actor
   });
+  const want = saved.calendar;
+  delete saved.calendar;
+  saved.calEvent = "";
   writeFields_(sheet, lastUsed + 1, map, saved);
   log_(actor, saved.id, "Oluşturuldu", saved.title);
+  applyCalendar_(sheet, lastUsed + 1, map, saved, null, want);
   return saved;
 }
 
@@ -657,8 +663,12 @@ function updateTask_(task, base, actor) {
   }
 
   const saved = Object.assign({}, task, { updatedAt: new Date().toISOString(), updatedBy: actor });
+  const want = saved.calendar;
+  delete saved.calendar;
+  saved.calEvent = old.calEvent || ""; // takvim kimliğini yalnızca sunucu yönetir
   // Yalnızca uygulamanın yönettiği sütunlara yazılır; diğer sütunlar (ör. formüller) korunur.
   writeFields_(sheet, idx + 1, map, saved, ["id"]);
+  applyCalendar_(sheet, idx + 1, map, saved, old, want);
 
   const changes = Object.keys(FIELD_LABELS)
     .filter((f) => f in map && String(old[f] || "") !== String(saved[f] || ""))
@@ -676,7 +686,7 @@ function gunlukEpostaAc() {
   const ui = SpreadsheetApp.getUi();
   ui.alert("Günlük e-posta açıldı",
     "Her gün " + getEmailTime_() + " civarında (Google ±15 dakika esneklikle çalıştırır) " +
-    Session.getEffectiveUser().getEmail() + " adresine bugünün işleri gönderilecek.", ui.ButtonSet.OK);
+    getEmailTo_().join(", ") + " adresine bugünün işleri gönderilecek.", ui.ButtonSet.OK);
 }
 
 function gunlukEpostaKapat() {
@@ -698,15 +708,35 @@ function birimEpostaDegistir() {
     : "Birim sorumlularına e-posta gönderimi kapatıldı. Yalnızca size gönderilecek.");
 }
 
+// Günlük e-postanın ve takvim davetlerinin gideceği adresler (virgülle ayrılmış). Boşsa E-Tablonun sahibi.
+function getEmailTo_() {
+  const raw = PropertiesService.getScriptProperties().getProperty("EMAIL_TO") || "";
+  const list = parseEmails_(raw);
+  return list.length ? list : [Session.getEffectiveUser().getEmail()].filter(Boolean);
+}
+
+function parseEmails_(raw) {
+  return String(raw || "").split(/[,;\s]+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
+}
+
+function validEmail_(x) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x); }
+
 function getEmailTime_() {
   return normalizeTime_(PropertiesService.getScriptProperties().getProperty("EMAIL_TIME")) || EMAIL_DEFAULT_TIME;
 }
 
-function enableDigest_(time, unitEmails) {
+function enableDigest_(time, unitEmails, to, calendar) {
   const props = PropertiesService.getScriptProperties();
+  if (typeof to === "string") {
+    const list = parseEmails_(to);
+    const bad = list.filter((x) => !validEmail_(x));
+    if (bad.length) throw new Error("Geçersiz e-posta adresi: " + bad.join(", "));
+    props.setProperty("EMAIL_TO", list.join(","));
+  }
   const t = normalizeTime_(time) || getEmailTime_();
   props.setProperty("EMAIL_TIME", t);
   if (unitEmails === true || unitEmails === false) props.setProperty("UNIT_EMAILS", unitEmails ? "1" : "0");
+  if (calendar === true || calendar === false) props.setProperty("EMAIL_CAL", calendar ? "1" : "0");
   removeDigestTriggers_();
   const p = t.split(":").map(Number);
   ScriptApp.newTrigger("gunlukEpostaGonder").timeBased()
@@ -728,8 +758,11 @@ function emailStatus_() {
   return {
     enabled: ScriptApp.getProjectTriggers().some((t) => t.getHandlerFunction() === "gunlukEpostaGonder"),
     time: getEmailTime_(),
-    to: Session.getEffectiveUser().getEmail(),
+    to: getEmailTo_().join(", "),
+    toSetting: props.getProperty("EMAIL_TO") || "",
+    owner: Session.getEffectiveUser().getEmail(),
     unitEmails: props.getProperty("UNIT_EMAILS") === "1",
+    calendar: props.getProperty("EMAIL_CAL") === "1",
     last: last,
     quota: MailApp.getRemainingDailyQuota()
   };
@@ -771,13 +804,17 @@ function gunlukEpostaGonder(force) {
     };
 
     if (!owner) throw new Error("Gönderen hesabın e-posta adresi okunamadı.");
-    send(owner, digest(null), "Tüm birimler", true);
+    const recipients = getEmailTo_();
+    const d = digest(null);
+    // Bugünün saatli işleri için (henüz gönderilmediyse) takvim daveti
+    d.invited = props.getProperty("EMAIL_CAL") === "1" ? inviteToday_(data, today) : [];
+    send(recipients.join(","), d, "Tüm birimler", true);
 
     if (props.getProperty("UNIT_EMAILS") === "1") {
       const byEmail = {};
       data.unitInfo.forEach((u) => {
         const mail = String(u.email || "").trim().toLowerCase();
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail) || mail === String(owner).toLowerCase()) return;
+        if (!validEmail_(mail) || mail === String(owner).toLowerCase() || recipients.indexOf(mail) >= 0) return;
         (byEmail[mail] = byEmail[mail] || []).push(u.name);
       });
       Object.keys(byEmail).forEach((mail) => send(mail, digest(byEmail[mail]), byEmail[mail].join(", "), force));
@@ -790,6 +827,115 @@ function gunlukEpostaGonder(force) {
     }));
     throw err;
   }
+}
+
+// ---- Takvim (Outlook dahil her takvime davet) -----------------------------------------
+// Etkinlik E-Tablo sahibinin Google Takvim'inde oluşturulur ve alıcı adreslere davet gönderilir.
+// Outlook / Office 365 bu daveti tanır: "Kabul et" denince etkinlik Outlook takvimine eklenir.
+
+function calendarGuests_() {
+  const owner = String(Session.getEffectiveUser().getEmail() || "").toLowerCase();
+  return getEmailTo_().filter((x) => x !== owner).join(",");
+}
+
+function eventTimes_(t) {
+  if (!t.due) throw new Error("Takvime eklemek için termin tarihi gerekir.");
+  const st = normalizeTime_(t.startTime), en = normalizeTime_(t.endTime);
+  if (!st && !en) {
+    const p = String(t.due).split("-").map(Number);
+    return { allDay: true, date: new Date(p[0], p[1] - 1, p[2]) };
+  }
+  const at = (hm) => Utilities.parseDate(t.due + " " + hm, EMAIL_TZ, "yyyy-MM-dd HH:mm");
+  let start = st ? at(st) : new Date(at(en).getTime() - 30 * 60000);
+  let end = en ? at(en) : new Date(start.getTime() + 60 * 60000);
+  if (end <= start) end = new Date(start.getTime() + 30 * 60000);
+  return { allDay: false, start: start, end: end };
+}
+
+function eventDetails_(t) {
+  const page = PropertiesService.getScriptProperties().getProperty("PAGE_URL") || "";
+  return {
+    title: "İş Takip: " + t.title,
+    description: [
+      [t.id, t.unit, t.priority].filter(Boolean).join(" · "),
+      t.note || "",
+      t.link ? "Bağlantı: " + t.link : "",
+      page ? "İş Takip: " + page : ""
+    ].filter(Boolean).join("\n")
+  };
+}
+
+function createCalEvent_(t) {
+  const cal = CalendarApp.getDefaultCalendar();
+  const when = eventTimes_(t);
+  const info = eventDetails_(t);
+  const guests = calendarGuests_();
+  const opts = { description: info.description };
+  if (guests) { opts.guests = guests; opts.sendInvites = true; }
+  const ev = when.allDay
+    ? cal.createAllDayEvent(info.title, when.date, opts)
+    : cal.createEvent(info.title, when.start, when.end, opts);
+  return ev.getId();
+}
+
+function deleteCalEvent_(id) {
+  if (!id) return;
+  const ev = CalendarApp.getDefaultCalendar().getEventById(id);
+  if (ev) ev.deleteEvent();
+}
+
+// want: true = takvimde olsun, false = takvimden kaldır, undefined = değiştirme (ör. yalnızca tamamlandı işareti)
+function applyCalendar_(sheet, row, map, saved, old, want) {
+  if (!("calEvent" in map)) return;
+  const before = (old && old.calEvent) || "";
+  let id = before;
+  const timingChanged = !!old && ["due", "startTime", "endTime"].some((f) => String(old[f] || "") !== String(saved[f] || ""));
+  try {
+    if (want === false || (saved.status === "İptal" && id)) {
+      deleteCalEvent_(id);
+      id = "";
+    } else if (want === true || (id && timingChanged)) {
+      const ev = id ? CalendarApp.getDefaultCalendar().getEventById(id) : null;
+      if (ev && !timingChanged) {
+        const info = eventDetails_(saved);
+        ev.setTitle(info.title);
+        ev.setDescription(info.description);
+      } else {
+        // Saat değiştiyse eski etkinlik silinip yeni davet gönderilir
+        if (ev) ev.deleteEvent();
+        id = createCalEvent_(saved);
+        // Davet gidecek bir alıcı yoksa etkinlik yalnızca sahibin Google Takvim'ine eklenir
+        saved.calendarInvited = calendarGuests_() ? true : "noguest";
+      }
+    }
+  } catch (err) {
+    saved.calendarError = "Görev kaydedildi ama takvim güncellenemedi: " + String((err && err.message) || err);
+  }
+  if (id !== before) sheet.getRange(row, map.calEvent + 1).setValue(toCell_("calEvent", id));
+  saved.calEvent = id;
+}
+
+// Günlük e-postayla: bugünün saatli, açık ve henüz takvime eklenmemiş işleri için davet
+function inviteToday_(data, today) {
+  const list = data.tasks.filter((t) => t.due === today && !t.done && t.status !== "İptal" &&
+    (t.startTime || t.endTime) && !t.calEvent);
+  if (!list.length) return [];
+  const sheet = tasksSheet_();
+  const map = headerMap_(sheet);
+  if (!("calEvent" in map)) return [];
+  const ids = sheet.getRange(1, map.id + 1, sheet.getLastRow(), 1).getValues().map((r) => String(r[0]));
+  const invited = [];
+  list.forEach((t) => {
+    const row = ids.indexOf(String(t.id));
+    if (row < 1) return;
+    try {
+      const id = createCalEvent_(t);
+      sheet.getRange(row + 1, map.calEvent + 1).setValue(toCell_("calEvent", id));
+      t.calEvent = id;
+      invited.push(t.id);
+    } catch (_) { /* bir davet başarısız olsa da e-posta gitsin */ }
+  });
+  return invited;
 }
 
 function daysBetween_(a, b) { return Math.round((Date.parse(b) - Date.parse(a)) / 86400000); }
@@ -826,6 +972,10 @@ function digestHtml_(d, today, page, who) {
   html += section("Önümüzdeki 3 gün", d.soon, (t) => row(t, formatTr_(t.due) + (timeOf(t) ? " " + timeOf(t) : ""), "#1c5cab"));
   if (!d.late.length && !d.todayList.length && !d.subs.length) {
     html += '<p style="margin:22px 0;color:#0a6e0a;font-weight:bold">Bugün için geciken ya da termini dolan iş yok.</p>';
+  }
+  if (d.invited && d.invited.length) {
+    html += '<p style="margin:18px 0 0;padding:10px 12px;background:#e3eefb;border-radius:8px;color:#1c5cab">📅 ' +
+      d.invited.length + ' saatli iş için ayrıca takvim daveti gönderildi. Davet e-postalarında <b>Kabul et</b> derseniz Outlook takviminize eklenir.</p>';
   }
   if (page) html += '<p style="margin-top:24px"><a href="' + escHtml_(page) + '" style="background:#2a78d6;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold">İş Takip\'i aç</a></p>';
   html += '<p style="color:#98a2b3;font-size:12px;margin-top:24px">Bu e-postayı kapatmak için E-Tabloda İş Takip → Günlük e-postayı kapat.</p></div>';
