@@ -12,11 +12,10 @@ const SHEET_SUBS = "AltGörevler";
 const SHEET_LOG = "Geçmiş";
 
 // Web sayfası bu numaraya bakarak hangi özelliklerin desteklendiğini anlar.
-const API_VERSION = 4;
+const API_VERSION = 5;
 
-// Günlük e-posta: her sabah bu saatte (Apps Script ±15 dakika esneklikle çalıştırır)
-const EMAIL_HOUR = 8;
-const EMAIL_MINUTE = 45;
+// Günlük e-posta: varsayılan gönderim saati (siteden değiştirilebilir; Google ±15 dakika esneklikle çalıştırır)
+const EMAIL_DEFAULT_TIME = "08:45";
 const EMAIL_TZ = "Europe/Istanbul";
 
 // Web şifresi: art arda hatalı denemelerde geçici kilit
@@ -39,14 +38,18 @@ const COLUMNS = {
   repeat: "Tekrar",
   link: "Bağlantı",
   updatedAt: "SonGüncelleme",
-  updatedBy: "Güncelleyen"
+  updatedBy: "Güncelleyen",
+  startTime: "BaşlangıçSaati",
+  endTime: "BitişSaati"
 };
-// Sonradan eklenen sütunlar: eski tablolarda yoksa kurulum sona ekler, yoksa da sayfa çalışır.
-const OPTIONAL_COLUMNS = ["repeat", "link", "updatedAt", "updatedBy"];
+// Sonradan eklenen sütunlar: eski tablolarda yoksa ilk kullanımda otomatik olarak sona eklenir.
+const OPTIONAL_COLUMNS = ["repeat", "link", "updatedAt", "updatedBy", "startTime", "endTime"];
+const TIME_FIELDS = ["startTime", "endTime"];
 const LOG_COLUMNS = ["Tarih", "Kişi", "GörevNo", "İşlem", "Ayrıntı"];
 const FIELD_LABELS = {
   assigned: "Atama tarihi", unit: "Birim", title: "Tanım", priority: "Öncelik", due: "Termin",
-  status: "Durum", doneDate: "Tamamlanma", note: "Not", repeat: "Tekrar", link: "Bağlantı"
+  status: "Durum", doneDate: "Tamamlanma", note: "Not", repeat: "Tekrar", link: "Bağlantı",
+  startTime: "Başlangıç saati", endTime: "Bitiş saati"
 };
 const UNIT_COLUMNS = { code: "BirimKodu", name: "BirimAdı", owner: "Sorumlu", email: "E-posta" };
 const SUB_COLUMNS = {
@@ -74,7 +77,7 @@ function onOpen() {
     .addItem("3. Web şifresi belirle", "webSifresiBelirle")
     .addItem("Bağlantı anahtarını yenile", "anahtariYenile")
     .addSeparator()
-    .addItem("Günlük e-postayı aç (her sabah " + EMAIL_HOUR + ":" + EMAIL_MINUTE + ")", "gunlukEpostaAc")
+    .addItem("Günlük e-postayı aç", "gunlukEpostaAc")
     .addItem("Günlük e-postayı kapat", "gunlukEpostaKapat")
     .addItem("Günlük e-postayı şimdi gönder (deneme)", "gunlukEpostaDene")
     .addItem("Birim sorumlularına da gönder: aç / kapat", "birimEpostaDegistir")
@@ -249,6 +252,10 @@ function doPost(e) {
         case "subDelete": return { ok: true, deleted: deleteSub_(body.id, actor) };
         case "history": return { ok: true, entries: readLog_(body.id) };
         case "comment": return { ok: true, entry: addComment_(body.id, body.text, actor) };
+        case "emailStatus": return { ok: true, email: emailStatus_() };
+        case "emailEnable": enableDigest_(body.time, body.unitEmails); return { ok: true, email: emailStatus_() };
+        case "emailDisable": removeDigestTriggers_(); return { ok: true, email: emailStatus_() };
+        case "emailTest": return { ok: true, sent: gunlukEpostaGonder(true), email: emailStatus_() };
         default: throw new Error("Bilinmeyen işlem: " + body.action);
       }
     } finally {
@@ -396,6 +403,8 @@ function writeFields_(sheet, row, map, obj, skip) {
 function tasksSheet_() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_TASKS);
   if (!sheet) throw new Error("\"" + SHEET_TASKS + "\" sayfası bulunamadı. İş Takip > 1. Kurulumu yap menüsünü çalıştırın.");
+  // Yeni sürümle gelen sütunları (ör. saatler) eski tablolara kendiliğinden ekle
+  if (!tasksSheet_.ensured) { ensureColumns_(sheet, OPTIONAL_COLUMNS.map((f) => COLUMNS[f])); tasksSheet_.ensured = true; }
   return sheet;
 }
 
@@ -412,6 +421,7 @@ function fromCell_(field, v, tz) {
   }
   if (field === "done") return v === true || String(v).toUpperCase() === "TRUE";
   if (field === "updatedAt" && v instanceof Date) return v.toISOString();
+  if (TIME_FIELDS.indexOf(field) >= 0) return normalizeTime_(v, tz);
   return v === null || v === undefined ? "" : String(v);
 }
 
@@ -422,9 +432,20 @@ function toCell_(field, v) {
     return new Date(p[0], p[1] - 1, p[2]);
   }
   if (field === "done") return !!v;
-  // Baştaki kesme işareti E-Tablonun zaman damgasını tarihe çevirmesini engeller
+  // Baştaki kesme işareti E-Tablonun zaman damgasını ve saati tarihe/saate çevirmesini engeller
   if (field === "updatedAt") return v ? "'" + String(v) : "";
+  if (TIME_FIELDS.indexOf(field) >= 0) { const t = normalizeTime_(v); return t ? "'" + t : ""; }
   return v === null || v === undefined ? "" : String(v);
+}
+
+// "9:5", "09.30", saat hücresi (Date) -> "HH:mm"; geçersizse ""
+function normalizeTime_(v, tz) {
+  if (v instanceof Date) return Utilities.formatDate(v, tz || EMAIL_TZ, "HH:mm");
+  const m = String(v == null ? "" : v).trim().match(/^(\d{1,2})[:.](\d{1,2})/);
+  if (!m) return "";
+  const h = Number(m[1]), mi = Number(m[2]);
+  if (h > 23 || mi > 59) return "";
+  return ("0" + h).slice(-2) + ":" + ("0" + mi).slice(-2);
 }
 
 function isEmptyRow_(row, map) {
@@ -651,12 +672,10 @@ function updateTask_(task, base, actor) {
 // ve önümüzdeki 3 günü e-postayla gönderir. Alıcı: E-Tablonun sahibi; istenirse her birimin sorumlusu.
 
 function gunlukEpostaAc() {
-  removeDigestTriggers_();
-  ScriptApp.newTrigger("gunlukEpostaGonder").timeBased()
-    .atHour(EMAIL_HOUR).nearMinute(EMAIL_MINUTE).everyDays(1).inTimezone(EMAIL_TZ).create();
+  enableDigest_(getEmailTime_(), null);
   const ui = SpreadsheetApp.getUi();
   ui.alert("Günlük e-posta açıldı",
-    "Her sabah " + EMAIL_HOUR + ":" + EMAIL_MINUTE + " civarında (Google ±15 dakika esneklikle çalıştırır) " +
+    "Her gün " + getEmailTime_() + " civarında (Google ±15 dakika esneklikle çalıştırır) " +
     Session.getEffectiveUser().getEmail() + " adresine bugünün işleri gönderilecek.", ui.ButtonSet.OK);
 }
 
@@ -679,6 +698,21 @@ function birimEpostaDegistir() {
     : "Birim sorumlularına e-posta gönderimi kapatıldı. Yalnızca size gönderilecek.");
 }
 
+function getEmailTime_() {
+  return normalizeTime_(PropertiesService.getScriptProperties().getProperty("EMAIL_TIME")) || EMAIL_DEFAULT_TIME;
+}
+
+function enableDigest_(time, unitEmails) {
+  const props = PropertiesService.getScriptProperties();
+  const t = normalizeTime_(time) || getEmailTime_();
+  props.setProperty("EMAIL_TIME", t);
+  if (unitEmails === true || unitEmails === false) props.setProperty("UNIT_EMAILS", unitEmails ? "1" : "0");
+  removeDigestTriggers_();
+  const p = t.split(":").map(Number);
+  ScriptApp.newTrigger("gunlukEpostaGonder").timeBased()
+    .atHour(p[0]).nearMinute(p[1]).everyDays(1).inTimezone(EMAIL_TZ).create();
+}
+
 function removeDigestTriggers_() {
   let n = 0;
   ScriptApp.getProjectTriggers().forEach((t) => {
@@ -687,49 +721,75 @@ function removeDigestTriggers_() {
   return n;
 }
 
-// Tetikleyici çağırır. force: boş gün de olsa gönder (deneme için).
+function emailStatus_() {
+  const props = PropertiesService.getScriptProperties();
+  let last = null;
+  try { last = JSON.parse(props.getProperty("LAST_EMAIL") || "null"); } catch (_) {}
+  return {
+    enabled: ScriptApp.getProjectTriggers().some((t) => t.getHandlerFunction() === "gunlukEpostaGonder"),
+    time: getEmailTime_(),
+    to: Session.getEffectiveUser().getEmail(),
+    unitEmails: props.getProperty("UNIT_EMAILS") === "1",
+    last: last,
+    quota: MailApp.getRemainingDailyQuota()
+  };
+}
+
+// Tetikleyici çağırır (her gün). force: deneme gönderimi; birim sorumlularına boş gün de gönderir.
+// Sahibine her gün gönderilir; iş yoksa "Bugün için acil iş yok" yazar.
 function gunlukEpostaGonder(force) {
   force = force === true;
-  const data = readAll_();
-  const today = Utilities.formatDate(new Date(), EMAIL_TZ, "yyyy-MM-dd");
-  const page = PropertiesService.getScriptProperties().getProperty("PAGE_URL") || "";
-  const owner = Session.getEffectiveUser().getEmail();
+  const props = PropertiesService.getScriptProperties();
   const sent = [];
+  try {
+    const data = readAll_();
+    const today = Utilities.formatDate(new Date(), EMAIL_TZ, "yyyy-MM-dd");
+    const page = props.getProperty("PAGE_URL") || "";
+    const owner = Session.getEffectiveUser().getEmail();
+    const byTime = (a, b) => ((a.due || "") + (a.startTime || a.endTime || "99:99") < (b.due || "") + (b.startTime || b.endTime || "99:99") ? -1 : 1);
 
-  const digest = (units) => {
-    const inUnits = (t) => !units || units.indexOf(t.unit) >= 0;
-    const open = data.tasks.filter((t) => inUnits(t) && !t.done && t.status !== "İptal");
-    const subs = data.subs.filter((x) => !x.done && x.due && x.due <= today &&
-      open.some((t) => t.id === x.taskId));
-    return {
-      late: open.filter((t) => t.due && t.due < today).sort((a, b) => (a.due < b.due ? -1 : 1)),
-      todayList: open.filter((t) => t.due === today),
-      subs: subs,
-      soon: open.filter((t) => t.due > today && daysBetween_(today, t.due) <= 3).sort((a, b) => (a.due < b.due ? -1 : 1))
+    const digest = (units) => {
+      const inUnits = (t) => !units || units.indexOf(t.unit) >= 0;
+      const open = data.tasks.filter((t) => inUnits(t) && !t.done && t.status !== "İptal");
+      const subs = data.subs.filter((x) => !x.done && x.due && x.due <= today &&
+        open.some((t) => t.id === x.taskId));
+      return {
+        late: open.filter((t) => t.due && t.due < today).sort(byTime),
+        todayList: open.filter((t) => t.due === today).sort(byTime),
+        subs: subs,
+        soon: open.filter((t) => t.due > today && daysBetween_(today, t.due) <= 3).sort(byTime)
+      };
     };
-  };
 
-  const send = (to, d, who) => {
-    const count = d.late.length + d.todayList.length + d.subs.length;
-    if (!count && !d.soon.length && !force) return;
-    const subject = "İş Takip · " + formatTr_(today) + " · " +
-      (count ? count + " iş bugün sizi bekliyor" : "Bugün için acil iş yok");
-    MailApp.sendEmail({ to: to, subject: subject, htmlBody: digestHtml_(d, today, page, who), name: "İş Takip" });
-    sent.push(to);
-  };
+    const send = (to, d, who, always) => {
+      const count = d.late.length + d.todayList.length + d.subs.length;
+      if (!always && !count && !d.soon.length) return;
+      const subject = "İş Takip · " + formatTr_(today) + " · " +
+        (count ? count + " iş bugün sizi bekliyor" : "Bugün için acil iş yok");
+      MailApp.sendEmail({ to: to, subject: subject, htmlBody: digestHtml_(d, today, page, who), name: "İş Takip" });
+      sent.push(to);
+    };
 
-  if (owner) send(owner, digest(null), "Tüm birimler");
+    if (!owner) throw new Error("Gönderen hesabın e-posta adresi okunamadı.");
+    send(owner, digest(null), "Tüm birimler", true);
 
-  if (PropertiesService.getScriptProperties().getProperty("UNIT_EMAILS") === "1") {
-    const byEmail = {};
-    data.unitInfo.forEach((u) => {
-      const mail = String(u.email || "").trim().toLowerCase();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail) || mail === String(owner).toLowerCase()) return;
-      (byEmail[mail] = byEmail[mail] || []).push(u.name);
-    });
-    Object.keys(byEmail).forEach((mail) => send(mail, digest(byEmail[mail]), byEmail[mail].join(", ")));
+    if (props.getProperty("UNIT_EMAILS") === "1") {
+      const byEmail = {};
+      data.unitInfo.forEach((u) => {
+        const mail = String(u.email || "").trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail) || mail === String(owner).toLowerCase()) return;
+        (byEmail[mail] = byEmail[mail] || []).push(u.name);
+      });
+      Object.keys(byEmail).forEach((mail) => send(mail, digest(byEmail[mail]), byEmail[mail].join(", "), force));
+    }
+    props.setProperty("LAST_EMAIL", JSON.stringify({ at: new Date().toISOString(), ok: true, to: sent, test: force }));
+    return sent;
+  } catch (err) {
+    props.setProperty("LAST_EMAIL", JSON.stringify({
+      at: new Date().toISOString(), ok: false, to: sent, test: force, error: String((err && err.message) || err)
+    }));
+    throw err;
   }
-  return sent;
 }
 
 function daysBetween_(a, b) { return Math.round((Date.parse(b) - Date.parse(a)) / 86400000); }
@@ -759,10 +819,11 @@ function digestHtml_(d, today, page, who) {
     '<div style="font-size:12px;color:#a9c0d4;letter-spacing:.06em">' + formatTr_(today) + " · " + escHtml_(who) + "</div>" +
     '<div style="font-size:20px;font-weight:bold;margin-top:4px">Bugün yapılması gerekenler</div></div>';
   html += section("Gecikenler", d.late, (t) => row(t, daysBetween_(t.due, today) + " gün gecikti", "#b42323"));
-  html += section("Bugün termini dolanlar", d.todayList, (t) => row(t, "Bugün", "#8a5a00"));
+  const timeOf = (t) => [t.startTime, t.endTime].filter(Boolean).join("–");
+  html += section("Bugün yapılacaklar", d.todayList, (t) => row(t, timeOf(t) ? "Bugün " + timeOf(t) : "Bugün", "#8a5a00"));
   html += section("Bugünkü ve geciken alt paketler", d.subs, (x) => row({ id: x.id, title: x.title, unit: "Alt paket", priority: "" },
     x.due < today ? daysBetween_(x.due, today) + " gün gecikti" : "Bugün", x.due < today ? "#b42323" : "#8a5a00"));
-  html += section("Önümüzdeki 3 gün", d.soon, (t) => row(t, formatTr_(t.due), "#1c5cab"));
+  html += section("Önümüzdeki 3 gün", d.soon, (t) => row(t, formatTr_(t.due) + (timeOf(t) ? " " + timeOf(t) : ""), "#1c5cab"));
   if (!d.late.length && !d.todayList.length && !d.subs.length) {
     html += '<p style="margin:22px 0;color:#0a6e0a;font-weight:bold">Bugün için geciken ya da termini dolan iş yok.</p>';
   }

@@ -33,6 +33,14 @@
         <div class="top-actions">
           <span id="modeBadge" class="badge"></span>
           <span id="userName" class="user"></span>
+          <button id="todayBtn" class="btn on-hero" hidden title="Bugünün ve gecikenlerin listesi">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 10h16M9 3v4M15 3v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Bugün
+          </button>
+          <button id="emailBtn" class="btn on-hero" hidden title="Günlük e-posta ayarları">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 7l9 6 9-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            E-posta
+          </button>
           <button id="whoBtn" class="btn on-hero" hidden title="Adınızı değiştirin">
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21a8 8 0 0 1 16 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
             <span id="whoName"></span>
@@ -162,6 +170,7 @@
             <h2>Görevler</h2>
             <div class="seg" role="tablist" aria-label="Görünüm">
               <button id="viewList" class="seg-btn active" data-view="list" role="tab">Liste</button>
+              <button id="viewDay" class="seg-btn" data-view="day" role="tab">Gün</button>
               <button id="viewBoard" class="seg-btn" data-view="board" role="tab">Pano</button>
               <button id="viewGantt" class="seg-btn" data-view="gantt" role="tab">Zaman</button>
             </div>
@@ -213,6 +222,7 @@
 
         <div id="boardView" class="board" hidden></div>
         <div id="ganttView" class="gantt" hidden></div>
+        <div id="dayView" class="dayview" hidden></div>
         <p id="noRows" class="no-rows" hidden>Filtreye uyan görev yok.</p>
       </div>
     </section>
@@ -241,6 +251,12 @@
         </label>
         <label>Termin tarihi
           <input name="due" type="date">
+        </label>
+        <label data-feature="times">Başlangıç saati
+          <input name="startTime" type="time" step="300">
+        </label>
+        <label data-feature="times">Bitiş saati
+          <input name="endTime" type="time" step="300">
         </label>
         <label>Durum
           <select name="status"></select>
@@ -305,6 +321,49 @@
       </div>
       <div class="dialog-actions">
         <button type="submit" class="btn primary">Kaydet</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="todayDialog" class="today-dialog" aria-labelledby="todayTitle">
+    <div class="dlg">
+      <div class="today-head">
+        <div>
+          <p class="today-date" id="todayDate"></p>
+          <h2 id="todayTitle">Bugün yapılacaklar</h2>
+        </div>
+        <button type="button" class="icon-x" data-action="close-today" aria-label="Kapat">×</button>
+      </div>
+      <p id="todaySummary" class="today-summary"></p>
+      <div id="todayBody" class="today-body"></div>
+      <div class="dialog-actions">
+        <label class="chip-toggle"><input id="todayMute" type="checkbox"> Bugün bir daha gösterme</label>
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-action="today-day">Gün görünümü</button>
+        <button type="button" class="btn primary" data-action="close-today">Tamam</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="emailDialog">
+    <form id="emailForm" method="dialog">
+      <h2>Günlük e-posta</h2>
+      <p class="form-help">Her sabah gecikenler, bugün yapılacaklar (saatleriyle) ve önümüzdeki 3 günün işleri e-postayla gelir.
+        Acil iş olmayan günlerde de "Bugün için acil iş yok" e-postası gönderilir.</p>
+      <div id="emailState" class="email-state"></div>
+      <div class="settings-fields">
+        <label>Gönderim saati
+          <select id="emailTime"></select>
+        </label>
+        <label class="chip-toggle"><input id="emailUnits" type="checkbox"> Birim sorumlularına da kendi birimlerinin işlerini gönder</label>
+      </div>
+      <p id="emailError" class="form-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" class="btn ghost danger" id="emailOffBtn" hidden>E-postayı kapat</button>
+        <button type="button" class="btn" id="emailTestBtn">Deneme e-postası gönder</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" data-action="close-email">Vazgeç</button>
+        <button type="submit" class="btn primary" id="emailOnBtn">Aç ve kaydet</button>
       </div>
     </form>
   </dialog>

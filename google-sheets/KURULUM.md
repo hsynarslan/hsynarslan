@@ -111,7 +111,8 @@ Güvenlik:
 
 Sayfada **"Google tarafındaki kodu güncelleyin"** uyarısı görüyorsanız E-Tablodaki köprü kodunun yeni sürümü
 gerekiyor. Örneğin birim yönetimi ve alt paketler 2. sürümle; değişiklik geçmişi, yorumlar, aynı anda düzenleme
-koruması, tekrar eden görevler ve günlük e-posta 4. sürümle geldi. Verileriniz silinmez; yaklaşık 3 dakika sürer.
+koruması, tekrar eden görevler ve günlük e-posta 4. sürümle; saatlik takip (başlangıç/bitiş saati) ve siteden
+e-posta yönetimi 5. sürümle geldi. Verileriniz silinmez; yaklaşık 3 dakika sürer.
 
 1. E-Tablonuzu açın ve **Uzantılar → Apps Script** yolunu izleyin.
 2. Kod alanındaki her şeyi silin (Ctrl+A, ardından Delete).
@@ -123,33 +124,38 @@ koruması, tekrar eden görevler ve günlük e-posta 4. sürümle geldi. Veriler
    Yeniden izin isterse 3. adımdaki gibi onaylayın.
 7. E-Tablo sekmesine dönüp sayfayı yenileyin ve **İş Takip → 1. Kurulumu yap** menüsünü bir kez çalıştırın.
    Bu adım yeni sayfaları (ör. **AltGörevler**, **Geçmiş**) oluşturur ve **Görevler** sayfasının sonuna eksik
-   sütunları (**Tekrar**, **Bağlantı**, **SonGüncelleme**, **Güncelleyen**) ekler; mevcut görevlerinize ve
-   anahtarınıza dokunmaz.
+   sütunları (**Tekrar**, **Bağlantı**, **SonGüncelleme**, **Güncelleyen**, **BaşlangıçSaati**, **BitişSaati**)
+   ekler; mevcut görevlerinize ve anahtarınıza dokunmaz. (5. sürümden itibaren eksik sütunlar ilk kullanımda
+   kendiliğinden de eklenir.)
 8. İş Takip sayfasını yenileyin. Uyarı kaybolur.
 
 > **"Yeni dağıtım" yapmayın.** Yeni dağıtım farklı bir adres üretir; o zaman sayfadaki Ayarlar'a yeni adresi
 > girmeniz gerekir. "Dağıtımları yönet → Yeni sürüm" yolu adresi aynı bırakır.
 
-## Günlük e-posta (her sabah 08:45)
+## Günlük e-posta
 
-E-Tablo her sabah size **bugün yapılması gerekenleri** e-postayla gönderir: geciken işler, termini bugün dolan işler,
-bugünkü ve geciken alt paketler, ayrıca önümüzdeki 3 günün işleri. E-posta, E-Tablonun sahibi olan Google
-hesabından yine o hesaba gider; ek bir hizmet gerekmez.
+E-Tablo her sabah size **bugün yapılması gerekenleri** e-postayla gönderir: geciken işler, bugün yapılacaklar
+(saatleriyle), bugünkü ve geciken alt paketler, ayrıca önümüzdeki 3 günün işleri. Acil iş olmayan günlerde de
+"Bugün için acil iş yok" e-postası gelir. E-posta, E-Tablonun sahibi olan Google hesabından yine o hesaba gider.
 
-1. E-Tabloda **İş Takip → Günlük e-postayı aç (her sabah 8:45)** menüsünü çalıştırın.
-   Google ilk seferde e-posta gönderme ve zamanlanmış çalışma izni ister; 3. adımdaki gibi onaylayın.
-2. Denemek için **İş Takip → Günlük e-postayı şimdi gönder (deneme)** menüsünü kullanın.
-3. İsterseniz **Birim sorumlularına da gönder: aç / kapat** ile her birimin sorumlusu da (Birimler sayfasındaki
-   **E-posta** sütunu) her sabah yalnızca kendi biriminin işlerini alır.
+**Siteden yönetim (önerilen, 5. sürüm):** Sayfanın üstündeki **E-posta** düğmesi.
+- Durumu (açık/kapalı), alıcıyı, **son gönderimi** ve varsa **hatanın ne olduğunu** gösterir.
+- **Gönderim saati** seçilir (15 dakikalık aralıklarla), **Aç ve kaydet** ile açılır.
+- **Deneme e-postası gönder** ile hemen bir e-posta gönderilir.
+- İsterseniz birim sorumlularına da (Birimler sayfasındaki **E-posta** sütunu) kendi birimlerinin işleri gider.
+
+**İlk seferde izin gerekir:** Google, e-posta göndermek ve her sabah çalışmak için sizden bir kez izin ister.
+Sitede *"Google, e-posta göndermek için sizden bir kez izin istiyor"* uyarısı görürseniz:
+1. E-Tabloda **İş Takip → Günlük e-postayı şimdi gönder (deneme)** menüsünü çalıştırın.
+2. Açılan izin ekranında 3. adımdaki gibi onaylayın (**Gelişmiş → … sayfasına git → İzin ver**).
+3. Size bir deneme e-postası gelir. Ardından sitede **E-posta → Aç ve kaydet** deyin.
 
 Notlar:
-- Google zamanlanmış görevleri tam dakikasında değil, seçilen saatin **±15 dakika** içinde çalıştırır;
-  e-posta genellikle 08:30–09:00 arasında gelir. Saat dilimi Türkiye (Europe/Istanbul) olarak ayarlıdır.
-- Geciken ya da termini dolan iş yoksa ve önümüzdeki 3 gün de boşsa o gün e-posta gönderilmez.
-- E-postadaki **İş Takip'i aç** düğmesi, sayfayı en son açtığınız adrese gider.
-- Kapatmak için **İş Takip → Günlük e-postayı kapat**.
-- Saati değiştirmek isterseniz Kod.gs'in başındaki `EMAIL_HOUR` ve `EMAIL_MINUTE` değerlerini değiştirip
-  **Günlük e-postayı aç** menüsünü yeniden çalıştırın.
+- Google zamanlanmış görevleri tam dakikasında değil, seçilen saatin **±15 dakika** içinde çalıştırır.
+  Saat dilimi Türkiye (Europe/Istanbul) olarak ayarlıdır.
+- E-posta gelmediyse önce **spam / Tanıtımlar** klasörüne bakın; sitedeki **Son gönderim** satırı gönderimin
+  yapılıp yapılmadığını ve hata varsa nedenini gösterir.
+- E-Tablo menüsündeki **Günlük e-postayı aç / kapat** seçenekleri de aynı işi görür.
 
 ## Güvenlik
 

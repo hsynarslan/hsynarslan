@@ -18,11 +18,14 @@
     repeat: "Tekrar",
     link: "Bağlantı",
     updatedAt: "SonGüncelleme",
-    updatedBy: "Güncelleyen"
+    updatedBy: "Güncelleyen",
+    startTime: "BaşlangıçSaati",
+    endTime: "BitişSaati"
   };
   const FIELD_LABELS = {
     assigned: "Atama tarihi", unit: "Birim", title: "Tanım", priority: "Öncelik", due: "Termin",
-    status: "Durum", doneDate: "Tamamlanma", note: "Not", repeat: "Tekrar", link: "Bağlantı"
+    status: "Durum", doneDate: "Tamamlanma", note: "Not", repeat: "Tekrar", link: "Bağlantı",
+    startTime: "Başlangıç saati", endTime: "Bitiş saati"
   };
   const DATE_FIELDS = ["assigned", "due", "doneDate"];
   const UNIT_NAME_COLUMN = "BirimAdı";
@@ -154,7 +157,7 @@
 
     get features() {
       const has = (f) => f in this.colIndex;
-      return { units: false, subtasks: false, conflicts: has("updatedAt"), repeat: has("repeat"), link: has("link") };
+      return { units: false, subtasks: false, conflicts: has("updatedAt"), repeat: has("repeat"), link: has("link"), times: has("startTime") };
     }
 
     async graph(method, path, body) {
@@ -302,8 +305,11 @@
     // Birim yönetimi ve alt paketler Kod.gs'in 2. sürümüyle gelir.
     // 4. sürüm: geçmiş, yorumlar, aynı anda düzenleme koruması, tekrar ve bağlantı sütunları.
     get features() {
-      const v4 = this.version >= 4;
-      return { units: this.version >= 2, subtasks: this.version >= 2, history: v4, conflicts: v4, repeat: v4, link: v4, needsUpdate: !v4 };
+      const v4 = this.version >= 4, v5 = this.version >= 5;
+      return {
+        units: this.version >= 2, subtasks: this.version >= 2, history: v4, conflicts: v4, repeat: v4, link: v4,
+        times: v5, email: v5, needsUpdate: !v5
+      };
     }
 
     async request(init, query) {
@@ -374,11 +380,29 @@
     async updateSub(sub) { await this.post({ action: "subUpdate", sub }); return sub; }
 
     async deleteSub(id) { await this.post({ action: "subDelete", id }); }
+
+    // ---- Günlük e-posta (Kod.gs 5. sürüm) ----
+    async emailCall(body) {
+      try {
+        return (await this.post(body)).email;
+      } catch (e) {
+        // Yeni e-posta/zamanlayıcı izni henüz verilmediyse Google bu türden bir hata döndürür
+        if (/permission|authoriz|yetki|izin|ScriptApp|MailApp/i.test(e.message || "")) {
+          throw new Error("Google, e-posta göndermek için sizden bir kez izin istiyor. E-Tabloda İş Takip > \"Günlük e-postayı şimdi gönder (deneme)\" menüsünü çalıştırıp izin verin, sonra burada yeniden deneyin.");
+        }
+        throw e;
+      }
+    }
+
+    emailStatus() { return this.emailCall({ action: "emailStatus" }); }
+    emailEnable(time, unitEmails) { return this.emailCall({ action: "emailEnable", time, unitEmails }); }
+    emailDisable() { return this.emailCall({ action: "emailDisable" }); }
+    emailTest() { return this.emailCall({ action: "emailTest" }); }
   }
 
   // ---- Demo deposu (localStorage) -------------------------------------------
 
-  const DEMO_KEY = "istakip-demo-v3";
+  const DEMO_KEY = "istakip-demo-v4";
 
   function daysFromToday(n) {
     const d = new Date();
@@ -417,8 +441,20 @@
       note: "",
       repeat: i === 13 ? "Yıllık" : i === 11 ? "Aylık" : "",
       link: i === 0 ? "https://drive.google.com/" : "",
-      updatedAt: "", updatedBy: ""
+      updatedAt: "", updatedBy: "",
+      startTime: "", endTime: ""
     }));
+    // Saatlik takip örneği: bugünün işlerine saat ver
+    const todayIdx = tasks.filter((t) => t.due === daysFromToday(0) && !t.done);
+    [["09:00", "10:30"], ["14:00", "15:00"]].forEach(([st, en], k) => {
+      if (todayIdx[k]) { todayIdx[k].startTime = st; todayIdx[k].endTime = en; }
+    });
+    tasks.push({
+      id: "G-" + String(tasks.length + 1).padStart(4, "0"), assigned: daysFromToday(-1), unit: "İdari İşler",
+      title: "Haftalık koordinasyon toplantısı", priority: "Orta", due: daysFromToday(0), status: "Atandı",
+      done: false, doneDate: "", note: "Toplantı salonu 2", repeat: "Haftalık", link: "",
+      updatedAt: "", updatedBy: "", startTime: "11:00", endTime: "12:00"
+    });
     const subs = [
       ["G-0001", "Teknik şartnamenin hazırlanması", true],
       ["G-0001", "Piyasa fiyat araştırması", true],
@@ -442,7 +478,7 @@
 
     get label() { return "Demo (tarayıcı belleği)"; }
 
-    get features() { return { units: true, subtasks: true, history: true, conflicts: true, repeat: true, link: true }; }
+    get features() { return { units: true, subtasks: true, history: true, conflicts: true, repeat: true, link: true, times: true }; }
 
     log(id, action, detail) {
       const entry = { at: new Date().toISOString(), by: this.actor || "", id: id || "", action, detail: detail || "" };

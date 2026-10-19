@@ -37,6 +37,10 @@ Tarayıcı (index.html)  ──MSAL ile giriş──►  Microsoft Entra ID
 - Yeni görev ekleme ve düzenleme (görev numarası otomatik: `G-0001`, `G-0002`…)
 - **Alt paketler:** her işin altında işaretlenebilir alt paketler (`G-0001.1`, `G-0001.2`…); listede ilerleme
   göstergesi ve tek tıkla açılan alt paket listesi
+- **Saatlik takip:** görevlere başlangıç/bitiş saati; saati geçen iş aynı gün içinde gecikmiş sayılır ("45 dk gecikti");
+  **Gün** görünümünde saat saat çizelge (şimdiki saat vurgulu, günler arasında gezinme)
+- **Günün açılış penceresi:** her girişte gecikenler ve bugün yapılacaklar; onay kutusuyla tek tıkla tamamlama
+- **Günlük e-posta:** siteden aç/kapat, saat seçimi, deneme gönderimi, son gönderim ve hata durumu
 - **Birim yönetimi:** web'den birim ekleme, düzenleme, silme; birim adı değişince bağlı işler de güncellenir
 - Termini geçmiş işler kırmızı işaretlenir, kaç gün geciktiği yazılır
 - **Zaman çizelgesi (Gantt):** atama tarihinden termine çubuklar, termin aşımı kırmızı, alt paket terminleri elmas;

@@ -69,8 +69,33 @@
     return Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
   }
 
+  // ---- Saat yardımcıları (saatlik takip) ----------------------------------------
+  function pad2(n) { return String(n).padStart(2, "0"); }
+  function nowHm() { const d = new Date(); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
+  function timeRange(t) { return [t.startTime, t.endTime].filter(Boolean).join("–"); }
+  // Saatli bir işin son anı: bitiş saati, yoksa başlangıç saati
+  function deadlineTime(t) { return t.endTime || t.startTime || ""; }
+  function minutesBetween(a, b) {
+    const [h1, m1] = a.split(":").map(Number), [h2, m2] = b.split(":").map(Number);
+    return h2 * 60 + m2 - (h1 * 60 + m1);
+  }
+  function fmtMinutes(n) {
+    if (n < 60) return `${n} dk`;
+    return `${Math.floor(n / 60)} sa${n % 60 ? ` ${n % 60} dk` : ""}`;
+  }
+  function byDueTime(a, b) {
+    const ka = (a.due || "9999") + (a.startTime || a.endTime || "~");
+    const kb = (b.due || "9999") + (b.startTime || b.endTime || "~");
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  }
+
+  // Termin günü geçtiyse ya da bugünse ve saati geçtiyse gecikmiştir
   function isLate(t) {
-    return !t.done && t.status !== "İptal" && t.due && t.due < todayIso();
+    if (t.done || t.status === "İptal" || !t.due) return false;
+    const today = todayIso();
+    if (t.due < today) return true;
+    const dl = deadlineTime(t);
+    return t.due === today && !!dl && dl < nowHm();
   }
 
   function isActive(t) { return t.status !== "İptal"; }
@@ -155,14 +180,21 @@
     const diff = daysBetween(todayIso(), t.due);
     if (t.status === "İptal") return null;
     if (diff < 0) return { cls: "late", text: `${-diff} gün gecikti` };
-    if (diff === 0) return { cls: "soon", text: "Bugün" };
-    if (diff === 1) return { cls: "soon", text: "Yarın" };
+    if (diff === 0) {
+      const dl = deadlineTime(t);
+      if (!dl) return { cls: "soon", text: "Bugün" };
+      const left = minutesBetween(nowHm(), dl);
+      if (left < 0) return { cls: "late", text: `${fmtMinutes(-left)} gecikti` };
+      return { cls: "soon", text: left <= 120 ? `${fmtMinutes(left)} kaldı` : `Bugün ${timeRange(t)}` };
+    }
+    if (diff === 1) return { cls: "soon", text: timeRange(t) ? `Yarın ${timeRange(t)}` : "Yarın" };
     return { cls: diff <= 7 ? "soon" : "ok", text: `${diff} gün kaldı` };
   }
 
   function dueHtml(t) {
     const info = dueInfo(t);
-    return `<div class="due"><span>${fmtDate(t.due) || "—"}</span>${info ? `<span class="due-rel ${info.cls}">${info.text}</span>` : ""}</div>`;
+    const tr = timeRange(t);
+    return `<div class="due"><span>${fmtDate(t.due) || "—"}${tr ? ` <span class="t-time">${esc(tr)}</span>` : ""}</span>${info ? `<span class="due-rel ${info.cls}">${info.text}</span>` : ""}</div>`;
   }
 
   function prioHtml(p) {
@@ -415,7 +447,7 @@
       .sort((a, b) => {
         let va = a[key] ?? "", vb = b[key] ?? "";
         if (key === "priority") { va = prioRank(va); vb = prioRank(vb); }
-        if (key === "due") { va = va || "9999"; vb = vb || "9999"; }
+        if (key === "due") { const r = byDueTime(a, b); return desc ? -r : r; }
         const r = va < vb ? -1 : va > vb ? 1 : 0;
         return desc ? -r : r;
       });
@@ -576,6 +608,199 @@
     sc.scrollLeft = keep !== null ? keep : Math.max(x(today) - sc.clientWidth / 3, 0);
   }
 
+  // ---- Görünüm: gün (saatlik çizelge) ------------------------------------------------
+
+  function agendaItemHtml(t) {
+    const info = dueInfo(t);
+    const tr = timeRange(t);
+    return `<div class="ag-item ${t.done ? "is-done" : ""} ${isLate(t) ? "is-late" : ""}" data-id="${esc(t.id)}">
+      <input class="tick" type="checkbox" data-action="toggle" ${t.done ? "checked" : ""} aria-label="${esc(t.title)} tamamlandı">
+      <div class="ag-main">
+        <div class="ag-title">${esc(t.title)}${linkHtml(t)}</div>
+        <div class="ag-meta">
+          ${tr ? `<span class="t-time">${esc(tr)}</span>` : ""}
+          <span class="unit-cell">${avatar(t.unit, true)}${esc(t.unit)}</span>
+          ${prioHtml(t.priority)}
+          ${info ? `<span class="due-rel ${info.cls}">${info.text}</span>` : ""}
+        </div>
+      </div>
+      <button type="button" class="btn small ghost" data-action="edit">Düzenle</button>
+    </div>`;
+  }
+
+  function agendaSubHtml(x) {
+    const parent = state.tasks.find((t) => t.id === x.taskId);
+    return `<ul class="sub-list ag-subs">${subItemHtml(x).replace("</li>", `<span class="ag-parent">${esc(parent ? parent.title : x.taskId)}</span></li>`)}</ul>`;
+  }
+
+  function dayLabel(iso) {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", weekday: "long" });
+  }
+
+  function renderDay(rows) {
+    const today = todayIso();
+    const day = state.dayDate || today;
+    const isToday = day === today;
+    const onDay = rows.filter((t) => t.due === day && isActive(t));
+    const timed = onDay.filter((t) => t.startTime || t.endTime).sort(byDueTime);
+    const untimed = onDay.filter((t) => !t.startTime && !t.endTime);
+    const late = isToday ? rows.filter((t) => isLate(t) && t.due < today).sort(byDueTime) : [];
+    const subs = state.features.subtasks ? state.subs.filter((x) => x.due === day) : [];
+
+    // Çizelge saat aralığı: 08–18, saatli işler dışarı taşıyorsa genişler
+    let from = 8, to = 18;
+    timed.forEach((t) => {
+      const s = parseInt(t.startTime || t.endTime, 10), e = parseInt(t.endTime || t.startTime, 10);
+      from = Math.min(from, s);
+      to = Math.max(to, e);
+    });
+    const nowH = new Date().getHours();
+    const hours = [];
+    for (let h = from; h <= to; h++) {
+      const items = timed.filter((t) => parseInt(t.startTime || t.endTime, 10) === h);
+      const cls = isToday && h === nowH ? "now" : isToday && h < nowH ? "past" : "";
+      hours.push(`<div class="hour-row ${cls}">
+        <div class="hour-label">${pad2(h)}:00${cls === "now" ? '<span class="now-tag">şimdi</span>' : ""}</div>
+        <div class="hour-slot">${items.map(agendaItemHtml).join("")}</div>
+      </div>`);
+    }
+
+    const section = (title, cls, body) => `<section class="day-sec ${cls}"><h3>${title}</h3>${body}</section>`;
+    const done = onDay.filter((t) => t.done).length;
+    $("#dayView").innerHTML = `
+      <div class="day-nav">
+        <button type="button" class="btn small" data-day="-1" aria-label="Önceki gün">‹</button>
+        <div class="day-title"><b>${esc(dayLabel(day))}</b>${isToday ? '<span class="pill st-DevamEdiyor">Bugün</span>' : ""}</div>
+        <button type="button" class="btn small" data-day="1" aria-label="Sonraki gün">›</button>
+        ${isToday ? "" : '<button type="button" class="btn small" data-day="today">Bugüne dön</button>'}
+        <span class="day-sum">${onDay.length ? `${done}/${onDay.length} tamamlandı` : ""}</span>
+      </div>
+      ${late.length ? section(`Gecikenler (${late.length})`, "late", late.map(agendaItemHtml).join("")) : ""}
+      ${untimed.length ? section(`Gün içinde, saati belirtilmemiş (${untimed.length})`, "", untimed.map(agendaItemHtml).join("")) : ""}
+      ${subs.length ? section(`Bu güne ait alt paketler (${subs.length})`, "", subs.map(agendaSubHtml).join("")) : ""}
+      ${section("Saat çizelgesi", "hours", hours.join(""))}
+      ${!onDay.length && !late.length ? '<p class="no-rows">Bu gün için planlanmış iş yok. Görev eklerken termin tarihi ve saat girebilirsiniz.</p>' : ""}`;
+    if (isToday) {
+      const nowRow = $("#dayView .hour-row.now");
+      if (nowRow && !state.dayScrolled) { state.dayScrolled = true; nowRow.scrollIntoView({ block: "nearest" }); }
+    }
+  }
+
+  // ---- Günün açılış penceresi: gecikenler + bugün yapılacaklar --------------------------
+
+  const TODAY_MUTE_KEY = "istakip-bugun-gizle";
+
+  function todayLists() {
+    const today = todayIso();
+    const late = state.tasks.filter((t) => isLate(t) && t.due < today).sort(byDueTime);
+    const todayList = state.tasks.filter((t) => t.due === today && isActive(t)).sort(byDueTime);
+    const activeIds = new Set(state.tasks.filter((t) => isActive(t)).map((t) => t.id));
+    const subs = state.features.subtasks
+      ? state.subs.filter((x) => x.due && x.due <= today && activeIds.has(x.taskId) && (!x.done || x.doneDate === today))
+      : [];
+    return { late, todayList, subs };
+  }
+
+  function renderToday() {
+    if (!$("#todayDialog").open) return;
+    const { late, todayList, subs } = todayLists();
+    const openToday = todayList.filter((t) => !t.done).length;
+    $("#todayDate").textContent = dayLabel(todayIso());
+    const parts = [];
+    if (late.length) parts.push(`<b class="late">${late.length} geciken</b>`);
+    parts.push(openToday ? `<b>${openToday} iş</b> bugün bekliyor` : "Bugün için bekleyen iş kalmadı");
+    if (todayList.length - openToday) parts.push(`${todayList.length - openToday} tanesi bitti`);
+    $("#todaySummary").innerHTML = parts.join(" · ");
+    const section = (title, cls, body) => `<section class="day-sec ${cls}"><h3>${title}</h3>${body}</section>`;
+    $("#todayBody").innerHTML =
+      (late.length ? section(`Süresi geçenler (${late.length})`, "late", late.map(agendaItemHtml).join("")) : "") +
+      (todayList.length ? section(`Bugün (${todayList.length})`, "", todayList.map(agendaItemHtml).join("")) : "") +
+      (subs.length ? section(`Alt paketler (${subs.length})`, "", subs.map(agendaSubHtml).join("")) : "") ||
+      '<p class="no-rows">Bugün için geciken ya da yapılacak iş yok.</p>';
+  }
+
+  function openToday() {
+    try { $("#todayMute").checked = localStorage.getItem(TODAY_MUTE_KEY) === todayIso(); } catch (_) {}
+    if (!$("#todayDialog").open) $("#todayDialog").showModal();
+    renderToday();
+  }
+
+  // Her girişte (sekme açılışı ya da kilit açma) bir kez, "bugün bir daha gösterme" seçilmediyse
+  function maybeShowToday() {
+    if (state.todayShown) return;
+    state.todayShown = true;
+    try { if (localStorage.getItem(TODAY_MUTE_KEY) === todayIso()) return; } catch (_) {}
+    const { late, todayList, subs } = todayLists();
+    if (!late.length && !todayList.some((t) => !t.done) && !subs.some((x) => !x.done)) return;
+    if ($("#nameDialog").open) {
+      $("#nameDialog").addEventListener("close", () => openToday(), { once: true });
+      return;
+    }
+    openToday();
+  }
+
+  // ---- Günlük e-posta ayarları ---------------------------------------------------------
+
+  function emailError(msg) {
+    const el = $("#emailError");
+    el.textContent = msg || "";
+    el.hidden = !msg;
+  }
+
+  function fmtDateTime(iso) {
+    const d = new Date(iso);
+    return isNaN(d) ? "" : d.toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+
+  function renderEmailState(st) {
+    if (!st) { $("#emailState").innerHTML = '<p class="muted">Durum alınıyor…</p>'; return; }
+    const last = st.last;
+    let lastHtml = '<span class="muted">Henüz gönderim yapılmadı.</span>';
+    if (last) {
+      lastHtml = last.ok
+        ? `<span class="ok-text">${fmtDateTime(last.at)} · ${last.test ? "deneme, " : ""}gönderildi${last.to && last.to.length ? ": " + esc(last.to.join(", ")) : ""}</span>`
+        : `<span class="err-text">${fmtDateTime(last.at)} · gönderilemedi: ${esc(last.error || "bilinmeyen hata")}</span>`;
+    }
+    $("#emailState").innerHTML = `
+      <div class="email-row"><span>Durum</span><b>${st.enabled ? '<span class="pill st-Tamamlandı">Açık</span>' : '<span class="pill st-Atandı">Kapalı</span>'}${st.enabled ? ` her gün ${esc(st.time)} civarı` : ""}</b></div>
+      <div class="email-row"><span>Alıcı</span><b>${esc(st.to || "—")}</b></div>
+      <div class="email-row"><span>Son gönderim</span>${lastHtml}</div>
+      ${typeof st.quota === "number" ? `<div class="email-row"><span>Bugün kalan gönderim hakkı</span><b>${st.quota}</b></div>` : ""}`;
+    $("#emailTime").value = st.time;
+    $("#emailUnits").checked = !!st.unitEmails;
+    $("#emailOffBtn").hidden = !st.enabled;
+    $("#emailOnBtn").textContent = st.enabled ? "Ayarları kaydet" : "Aç ve kaydet";
+  }
+
+  async function emailAction(fn, busyBtn, busyText, okMsg) {
+    emailError("");
+    const label = busyBtn ? busyBtn.textContent : "";
+    document.querySelectorAll("#emailForm button").forEach((b) => { b.disabled = true; });
+    if (busyBtn) busyBtn.textContent = busyText;
+    try {
+      const st = await fn();
+      renderEmailState(st);
+      if (okMsg) toast(typeof okMsg === "function" ? okMsg(st) : okMsg);
+    } catch (e) {
+      emailError(e.message || String(e));
+    } finally {
+      document.querySelectorAll("#emailForm button").forEach((b) => { b.disabled = false; });
+      if (busyBtn) busyBtn.textContent = label;
+    }
+  }
+
+  function openEmail() {
+    const sel = $("#emailTime");
+    if (!sel.options.length) {
+      for (let h = 5; h <= 22; h++) for (const m of ["00", "15", "30", "45"]) sel.add(new Option(`${pad2(h)}:${m}`));
+    }
+    emailError("");
+    renderEmailState(null);
+    $("#emailDialog").showModal();
+    emailAction(() => state.store.emailStatus());
+  }
+
   // ---- Adres çubuğundaki filtreler: görünüm bağlantı olarak paylaşılabilir --------------
 
   function readUrlFilters() {
@@ -594,7 +819,7 @@
     set("ara", $("#search").value.trim());
     set("geciken", $("#overdueOnly").checked ? "1" : "");
     set("gizle", $("#hideDone").checked ? "1" : "");
-    set("gorunum", state.view !== "list" ? { board: "pano", gantt: "zaman" }[state.view] : "");
+    set("gorunum", state.view !== "list" ? { board: "pano", gantt: "zaman", day: "gun" }[state.view] : "");
     const qs = p.toString();
     const url = location.pathname + (qs ? "?" + qs : "") + location.hash;
     if (url !== location.pathname + location.search + location.hash) {
@@ -603,7 +828,7 @@
   }
 
   function setView(view) {
-    state.view = ["list", "board", "gantt"].includes(view) ? view : "list";
+    state.view = ["list", "day", "board", "gantt"].includes(view) ? view : "list";
     document.querySelectorAll(".toolbar .seg-btn").forEach((b) => b.classList.toggle("active", b.dataset.view === state.view));
   }
 
@@ -613,10 +838,13 @@
     $("#listView").hidden = state.view !== "list";
     $("#boardView").hidden = state.view !== "board";
     $("#ganttView").hidden = state.view !== "gantt";
+    $("#dayView").hidden = state.view !== "day";
     if (state.view === "list") renderTable(rows);
     else if (state.view === "board") renderBoard(rows);
+    else if (state.view === "day") renderDay(rows);
     else renderGantt(rows);
     $("#noRows").hidden = rows.length > 0 || state.view !== "list";
+    renderToday();
     renderStats();
     renderUnitProgress();
     syncUrl();
@@ -663,7 +891,10 @@
       renderWho();
       render();
       show("#appView");
+      $("#todayBtn").hidden = false;
+      $("#emailBtn").hidden = !state.features.email;
       if (state.features.history && !state.actor && !(state.auth && state.auth.account)) askName();
+      if (!quiet) maybeShowToday();
     } catch (e) {
       console.error(e);
       if (!quiet) { show("#appView"); toast(e.message || String(e), true); }
@@ -739,7 +970,8 @@
     if (state.tasks.some((x) => x.id !== t.id && x.title === t.title && x.unit === t.unit && x.due === due)) return;
     const next = {
       title: t.title, unit: t.unit, priority: t.priority, assigned, due, status: cfg.statuses[0],
-      done: false, doneDate: "", note: t.note || "", repeat: t.repeat, link: t.link || ""
+      done: false, doneDate: "", note: t.note || "", repeat: t.repeat, link: t.link || "",
+      startTime: t.startTime || "", endTime: t.endTime || ""
     };
     try {
       const saved = await state.store.addTask(next, state.tasks);
@@ -993,7 +1225,7 @@
 
   // ---- Form -------------------------------------------------------------------
 
-  const FORM_FIELDS = ["title", "unit", "priority", "assigned", "due", "status", "doneDate", "note", "repeat", "link"];
+  const FORM_FIELDS = ["title", "unit", "priority", "assigned", "due", "startTime", "endTime", "status", "doneDate", "note", "repeat", "link"];
 
   function openDialog(task) {
     const form = $("#taskForm");
@@ -1123,6 +1355,11 @@
     const task = { ...base };
     for (const f of FORM_FIELDS) task[f] = form[f].value.trim();
     if (task.link && !safeLink(task.link)) { toast("Bağlantı http:// ya da https:// ile başlamalı.", true); form.link.focus(); return; }
+    if (task.startTime && task.endTime && task.endTime < task.startTime) {
+      toast("Bitiş saati başlangıç saatinden önce olamaz.", true); form.endTime.focus(); return;
+    }
+    // Saat girilip tarih boş bırakıldıysa iş bugüne planlanmış sayılır
+    if ((task.startTime || task.endTime) && !task.due) task.due = todayIso();
     const final = withStatus(task, task.status);
 
     const btn = form.querySelector("[type=submit]");
@@ -1261,6 +1498,55 @@
         if (again) again.focus();
       }
     });
+
+    for (const id of ["#dayView", "#todayBody"]) {
+      $(id).addEventListener("click", (e) => {
+        const nav = e.target.closest("[data-day]");
+        if (nav) {
+          const v = nav.dataset.day;
+          state.dayDate = v === "today" ? todayIso() : addDays(state.dayDate || todayIso(), Number(v));
+          return renderFiltered();
+        }
+        const subLi = e.target.closest("li[data-sub]");
+        if (subLi && e.target.dataset.action === "sub-toggle") return toggleSub(subLi.dataset.sub, e.target);
+        const item = e.target.closest("[data-id]");
+        if (!item) return;
+        if (e.target.dataset.action === "toggle") return toggleDone(item.dataset.id, e.target);
+        if (e.target.closest("a")) return;
+        if (e.target.dataset.action === "edit") {
+          if (id === "#todayBody") $("#todayDialog").close();
+          openDialog(state.tasks.find((t) => t.id === item.dataset.id));
+        }
+      });
+    }
+    document.querySelectorAll("[data-action=close-today]").forEach((b) => b.addEventListener("click", () => $("#todayDialog").close()));
+    document.querySelector("[data-action=today-day]").addEventListener("click", () => {
+      $("#todayDialog").close();
+      state.dayDate = todayIso();
+      setView("day");
+      renderFiltered();
+      $("#dayView").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    $("#todayMute").addEventListener("change", (e) => {
+      try {
+        if (e.target.checked) localStorage.setItem(TODAY_MUTE_KEY, todayIso());
+        else localStorage.removeItem(TODAY_MUTE_KEY);
+      } catch (_) {}
+    });
+    $("#todayBtn").addEventListener("click", openToday);
+
+    $("#emailBtn").addEventListener("click", openEmail);
+    $("#emailForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      emailAction(() => state.store.emailEnable($("#emailTime").value, $("#emailUnits").checked), $("#emailOnBtn"), "Kaydediliyor…",
+        (st) => `Günlük e-posta açık: her gün ${st.time} civarında ${st.to} adresine gönderilecek`);
+    });
+    $("#emailOffBtn").addEventListener("click", () =>
+      emailAction(() => state.store.emailDisable(), $("#emailOffBtn"), "Kapatılıyor…", "Günlük e-posta kapatıldı"));
+    $("#emailTestBtn").addEventListener("click", () =>
+      emailAction(() => state.store.emailTest(), $("#emailTestBtn"), "Gönderiliyor…",
+        (st) => `Deneme e-postası gönderildi${st.last && st.last.to ? ": " + st.last.to.join(", ") : ""}. Gelmezse spam klasörüne bakın.`));
+    $("#emailForm [data-action=close-email]").addEventListener("click", () => $("#emailDialog").close());
 
     for (const id of ["#taskBody", "#boardView"]) {
       $(id).addEventListener("click", (e) => {
@@ -1497,7 +1783,10 @@
     document.querySelectorAll("dialog[open]").forEach((d) => d.close());
     // Kilitliyken önceki verilerin hiçbiri sayfada kalmasın
     for (const id of ["#taskBody", "#boardView", "#upcoming", "#unitProgress", "#stats", "#statusChart",
-      "#heroSummary", "#heroRing", "#unitsBody", "#subsList"]) $(id).innerHTML = "";
+      "#heroSummary", "#heroRing", "#unitsBody", "#subsList", "#dayView", "#todayBody", "#ganttView"]) $(id).innerHTML = "";
+    state.todayShown = false;
+    $("#todayBtn").hidden = true;
+    $("#emailBtn").hidden = true;
     const [title, text, submit, pwLabel] = LOCK_TEXT[mode];
     $("#lockTitle").textContent = title;
     $("#lockText").textContent = text;
@@ -1796,7 +2085,7 @@
     } catch (_) {}
     // Bağlantıyla gelen filtreler kayıtlı görünümün önüne geçer
     state.urlFilters = readUrlFilters();
-    const fromUrl = { pano: "board", zaman: "gantt" }[state.urlFilters.view];
+    const fromUrl = { pano: "board", zaman: "gantt", gun: "day" }[state.urlFilters.view];
     if (fromUrl) setView(fromUrl);
     start();
   }
