@@ -776,6 +776,12 @@
     $("#emailTo").value = st.toSetting || "";
     $("#emailTo").placeholder = st.owner ? `Boş bırakılırsa: ${st.owner}` : $("#emailTo").placeholder;
     $("#emailCal").checked = !!st.calendar;
+    document.querySelectorAll("[data-email-v7]").forEach((el) => { el.hidden = !state.features.notify; });
+    $("#emailRemind").checked = !!st.remind;
+    $("#emailSender").value = st.sender || "";
+    $("#emailSenderName").value = st.senderName || "";
+    $("#senderHelp").innerHTML = `E-postalar ${esc(st.owner || "Google hesabınız")} üzerinden <b>${esc(st.senderName || "İş Takip")}</b> adıyla gider.` +
+      (st.sender ? ` Alıcılar "Yanıtla" dediğinde yanıt <b>${esc(st.sender)}</b> adresine gelir.` : " Yanıt adresi girerseniz yanıtlar o adrese gelir.");
     $("#emailCal").closest("label").hidden = !state.features.calendar;
     state.emailTo = st.to;
     $("#emailOffBtn").hidden = !st.enabled;
@@ -957,6 +963,14 @@
         toast(`${task.id} kaydedildi`);
         if (!prev.done && saved.done && saved.repeat) await spawnNext(saved);
       }
+      if (saved.notifyError) toast(saved.notifyError, true);
+      else if (saved.notified) {
+        const msg = `${saved.id} için birim sorumlusuna e-posta gönderildi: ${saved.notified}`;
+        setTimeout(() => toast(msg), saved.calendarInvited ? 2600 : 0);
+      }
+      delete saved.notifyError;
+      delete saved.notified;
+      delete saved.notify;
       if (saved.calendarError) toast(saved.calendarError, true);
       else if (saved.calendarInvited === "noguest") toast("Etkinlik Google Takvim'inize eklendi. Outlook'a davet gitmesi için E-posta penceresinden alıcı adresini girin.", true);
       else if (saved.calendarInvited) toast(`${saved.id} takvime eklendi; davet ${state.emailTo || "alıcı adresine"} gönderildi. Outlook'ta "Kabul et" deyin.`);
@@ -1255,6 +1269,10 @@
     };
     for (const f of FORM_FIELDS) form[f].value = t[f] || "";
     state.dialogBase = task ? { ...task } : null;
+    const notifyRemember = (() => { try { return localStorage.getItem("istakip-bildir") !== "0"; } catch (_) { return true; } })();
+    // Yeni görevde son seçim hatırlanır; mevcut görevde yalnızca istenirse yeniden gönderilir
+    $("#notifyInput").checked = task ? false : notifyRemember;
+    state.notifyBaseUnit = task ? task.unit : null;
     const calRemember = (() => { try { return localStorage.getItem("istakip-takvim") === "1"; } catch (_) { return false; } })();
     $("#calInput").checked = task ? !!task.calEvent : calRemember;
     $("#calState").textContent = task && task.calEvent ? "Takvimde var. Saat değişirse yeni davet gider; kutuyu kaldırırsanız takvimden silinir." : "";
@@ -1262,6 +1280,7 @@
     $("#subTitle").value = "";
     $("#subDue").value = "";
     $("#taskDialog").showModal();
+    updateNotifyHint();
     renderDialogSubs();
     loadHistory();
     form.title.focus();
@@ -1366,6 +1385,20 @@
     }
   }
 
+  // Seçili birimin sorumlu e-postasını göster; birim değişince seçeneği öner
+  function updateNotifyHint() {
+    if (!state.features.notify) return;
+    const unit = $("#taskForm").unit.value;
+    const u = state.unitInfo.find((x) => x.name === unit);
+    const mail = u && u.email ? u.email : "";
+    const box = $("#notifyInput");
+    box.disabled = !mail;
+    if (!mail) box.checked = false;
+    $("#notifyState").textContent = mail
+      ? `→ ${u.owner ? u.owner + " · " : ""}${mail}`
+      : "Bu birimin e-posta adresi yok; Birimleri yönet'ten ekleyebilirsiniz.";
+  }
+
   async function submitDialog(ev) {
     ev.preventDefault();
     const form = $("#taskForm");
@@ -1378,6 +1411,10 @@
     }
     // Saat girilip tarih boş bırakıldıysa iş bugüne planlanmış sayılır
     if ((task.startTime || task.endTime) && !task.due) task.due = todayIso();
+    if (state.features.notify) {
+      task.notify = $("#notifyInput").checked && !$("#notifyInput").disabled;
+      if (!state.editingId) { try { localStorage.setItem("istakip-bildir", $("#notifyInput").checked ? "1" : "0"); } catch (_) {} }
+    }
     if (state.features.calendar) {
       task.calendar = $("#calInput").checked;
       if (task.calendar && !task.due) { toast("Takvime eklemek için termin tarihi girin.", true); form.due.focus(); return; }
@@ -1561,8 +1598,14 @@
     $("#emailBtn").addEventListener("click", openEmail);
     $("#emailForm").addEventListener("submit", (e) => {
       e.preventDefault();
-      emailAction(() => state.store.emailEnable($("#emailTime").value, $("#emailUnits").checked, $("#emailTo").value.trim(),
-        state.features.calendar ? $("#emailCal").checked : undefined), $("#emailOnBtn"), "Kaydediliyor…",
+      const o = { time: $("#emailTime").value, unitEmails: $("#emailUnits").checked, to: $("#emailTo").value.trim() };
+      if (state.features.calendar) o.calendar = $("#emailCal").checked;
+      if (state.features.notify) {
+        o.remind = $("#emailRemind").checked;
+        o.sender = $("#emailSender").value.trim();
+        o.senderName = $("#emailSenderName").value.trim();
+      }
+      emailAction(() => state.store.emailEnable(o), $("#emailOnBtn"), "Kaydediliyor…",
         (st) => `Günlük e-posta açık: her gün ${st.time} civarında ${st.to} adresine gönderilecek`);
     });
     $("#emailOffBtn").addEventListener("click", () =>
@@ -1639,6 +1682,11 @@
     });
 
     $("#newBtn").addEventListener("click", () => openDialog(null));
+    $("#taskForm").unit.addEventListener("change", () => {
+      // Birim değiştiyse yeni birimin sorumlusuna bildirmeyi öner
+      if (state.editingId && $("#taskForm").unit.value !== state.notifyBaseUnit) $("#notifyInput").checked = true;
+      updateNotifyHint();
+    });
     $("#subAddBtn").addEventListener("click", addSubFromDialog);
     $("#subTitle").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addSubFromDialog(); } });
     $("#subsList").addEventListener("click", onDialogSubsClick);

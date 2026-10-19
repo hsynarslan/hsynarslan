@@ -43,6 +43,8 @@ Tarayıcı (index.html)  ──MSAL ile giriş──►  Microsoft Entra ID
 - **Günlük e-posta:** siteden aç/kapat, saat seçimi, deneme gönderimi, son gönderim ve hata durumu
 - **Outlook takvimi:** görev penceresinde "Takvime ekle" seçeneği; Google Takvim üzerinden alıcıya davet gider,
   "Kabul et" ile Outlook takvimine eklenir; saat değişince yeni davet, iptal edilince silinir
+- **Atama bildirimi:** görev atanınca (isteğe bağlı) birim sorumlusuna e-posta; **son gün hatırlatması** termin
+  günü sabahı birim sorumlusuna; e-postalar seçilen gönderen adıyla gider, yanıtlar kurum adresine gelir
 - **Birim yönetimi:** web'den birim ekleme, düzenleme, silme; birim adı değişince bağlı işler de güncellenir
 - Termini geçmiş işler kırmızı işaretlenir, kaç gün geciktiği yazılır
 - **Zaman çizelgesi (Gantt):** atama tarihinden termine çubuklar, termin aşımı kırmızı, alt paket terminleri elmas;

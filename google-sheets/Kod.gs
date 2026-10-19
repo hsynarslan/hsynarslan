@@ -12,7 +12,7 @@ const SHEET_SUBS = "AltGörevler";
 const SHEET_LOG = "Geçmiş";
 
 // Web sayfası bu numaraya bakarak hangi özelliklerin desteklendiğini anlar.
-const API_VERSION = 6;
+const API_VERSION = 7;
 
 // Günlük e-posta: varsayılan gönderim saati (siteden değiştirilebilir; Google ±15 dakika esneklikle çalıştırır)
 const EMAIL_DEFAULT_TIME = "08:45";
@@ -254,7 +254,10 @@ function doPost(e) {
         case "history": return { ok: true, entries: readLog_(body.id) };
         case "comment": return { ok: true, entry: addComment_(body.id, body.text, actor) };
         case "emailStatus": return { ok: true, email: emailStatus_() };
-        case "emailEnable": enableDigest_(body.time, body.unitEmails, body.to, body.calendar); return { ok: true, email: emailStatus_() };
+        case "emailEnable":
+          saveSender_(body.sender, body.senderName, body.remind);
+          enableDigest_(body.time, body.unitEmails, body.to, body.calendar);
+          return { ok: true, email: emailStatus_() };
         case "emailDisable": removeDigestTriggers_(); return { ok: true, email: emailStatus_() };
         case "emailTest": return { ok: true, sent: gunlukEpostaGonder(true), email: emailStatus_() };
         default: throw new Error("Bilinmeyen işlem: " + body.action);
@@ -637,11 +640,14 @@ function addTask_(task, actor) {
     id: ID_PREFIX + ("000" + (max + 1)).slice(-4), updatedAt: new Date().toISOString(), updatedBy: actor
   });
   const want = saved.calendar;
+  const notify = saved.notify === true;
   delete saved.calendar;
+  delete saved.notify;
   saved.calEvent = "";
   writeFields_(sheet, lastUsed + 1, map, saved);
   log_(actor, saved.id, "Oluşturuldu", saved.title);
   applyCalendar_(sheet, lastUsed + 1, map, saved, null, want);
+  if (notify) notifyAssign_(saved, actor);
   return saved;
 }
 
@@ -664,11 +670,14 @@ function updateTask_(task, base, actor) {
 
   const saved = Object.assign({}, task, { updatedAt: new Date().toISOString(), updatedBy: actor });
   const want = saved.calendar;
+  const notify = saved.notify === true;
   delete saved.calendar;
+  delete saved.notify;
   saved.calEvent = old.calEvent || ""; // takvim kimliğini yalnızca sunucu yönetir
   // Yalnızca uygulamanın yönettiği sütunlara yazılır; diğer sütunlar (ör. formüller) korunur.
   writeFields_(sheet, idx + 1, map, saved, ["id"]);
   applyCalendar_(sheet, idx + 1, map, saved, old, want);
+  if (notify) notifyAssign_(saved, actor);
 
   const changes = Object.keys(FIELD_LABELS)
     .filter((f) => f in map && String(old[f] || "") !== String(saved[f] || ""))
@@ -763,6 +772,9 @@ function emailStatus_() {
     owner: Session.getEffectiveUser().getEmail(),
     unitEmails: props.getProperty("UNIT_EMAILS") === "1",
     calendar: props.getProperty("EMAIL_CAL") === "1",
+    remind: props.getProperty("REMIND_LAST_DAY") === "1",
+    sender: props.getProperty("SENDER") || "",
+    senderName: props.getProperty("SENDER_NAME") || "",
     last: last,
     quota: MailApp.getRemainingDailyQuota()
   };
@@ -799,7 +811,7 @@ function gunlukEpostaGonder(force) {
       if (!always && !count && !d.soon.length) return;
       const subject = "İş Takip · " + formatTr_(today) + " · " +
         (count ? count + " iş bugün sizi bekliyor" : "Bugün için acil iş yok");
-      MailApp.sendEmail({ to: to, subject: subject, htmlBody: digestHtml_(d, today, page, who), name: "İş Takip" });
+      sendMail_({ to: to, subject: subject, htmlBody: digestHtml_(d, today, page, who) });
       sent.push(to);
     };
 
@@ -819,7 +831,10 @@ function gunlukEpostaGonder(force) {
       });
       Object.keys(byEmail).forEach((mail) => send(mail, digest(byEmail[mail]), byEmail[mail].join(", "), force));
     }
-    props.setProperty("LAST_EMAIL", JSON.stringify({ at: new Date().toISOString(), ok: true, to: sent, test: force }));
+    // Son gün hatırlatması: termini bugün olan açık işler için birim sorumlusuna
+    let reminded = [];
+    if (props.getProperty("REMIND_LAST_DAY") === "1") reminded = sendLastDayReminders_(data, today);
+    props.setProperty("LAST_EMAIL", JSON.stringify({ at: new Date().toISOString(), ok: true, to: sent, test: force, reminded: reminded }));
     return sent;
   } catch (err) {
     props.setProperty("LAST_EMAIL", JSON.stringify({
@@ -827,6 +842,103 @@ function gunlukEpostaGonder(force) {
     }));
     throw err;
   }
+}
+
+// ---- Gönderen adı, yanıt adresi ve tek noktadan e-posta gönderimi -----------------------
+// E-postalar E-Tablo sahibinin Google hesabından (MailApp) gider. Gönderen adı SENDER_NAME olur,
+// "Yanıtla" denince yanıtlar SENDER adresine (ör. kurum e-postası) gelir.
+
+function saveSender_(sender, senderName, remind) {
+  const props = PropertiesService.getScriptProperties();
+  if (typeof sender === "string") {
+    const x = sender.trim().toLowerCase();
+    if (x && !validEmail_(x)) throw new Error("Geçersiz yanıt adresi: " + x);
+    props.setProperty("SENDER", x);
+  }
+  if (typeof senderName === "string") props.setProperty("SENDER_NAME", senderName.trim().slice(0, 80));
+  if (remind === true || remind === false) props.setProperty("REMIND_LAST_DAY", remind ? "1" : "0");
+}
+
+function sendMail_(o) {
+  const props = PropertiesService.getScriptProperties();
+  const replyTo = props.getProperty("SENDER") || "";
+  const opts = { to: o.to, subject: o.subject, htmlBody: o.htmlBody, name: props.getProperty("SENDER_NAME") || "İş Takip" };
+  if (o.cc) opts.cc = o.cc;
+  if (replyTo) opts.replyTo = replyTo;
+  MailApp.sendEmail(opts);
+}
+
+function unitEmail_(unitName) {
+  const u = readUnits_().find((x) => x.name === unitName);
+  const mail = u ? String(u.email || "").trim().toLowerCase() : "";
+  return { mail: validEmail_(mail) ? mail : "", owner: u ? u.owner : "" };
+}
+
+function taskCardHtml_(t, intro, color) {
+  const page = PropertiesService.getScriptProperties().getProperty("PAGE_URL") || "";
+  const when = [formatTr_(t.due), [t.startTime, t.endTime].filter(Boolean).join("–")].filter((x) => x && x !== "—").join(" ");
+  const row = (k, v) => v ? '<tr><td style="padding:6px 0;color:#5d6b7e;width:120px">' + k + '</td><td style="padding:6px 0"><b>' + escHtml_(v) + "</b></td></tr>" : "";
+  return '<div style="font-family:Arial,sans-serif;max-width:600px;color:#142030">' +
+    '<div style="background:' + (color || "#0e2a3f") + ';color:#fff;padding:16px 20px;border-radius:12px">' +
+    '<div style="font-size:12px;opacity:.8;letter-spacing:.06em">' + escHtml_(intro) + "</div>" +
+    '<div style="font-size:19px;font-weight:bold;margin-top:4px">' + escHtml_(t.title) + "</div></div>" +
+    '<table style="margin-top:14px;font-size:14px;border-collapse:collapse">' +
+    row("İş no", t.id) + row("Birim", t.unit) + row("Termin", when || "—") + row("Öncelik", t.priority) + row("Not", t.note) +
+    (t.link ? '<tr><td style="padding:6px 0;color:#5d6b7e">Bağlantı</td><td style="padding:6px 0"><a href="' + escHtml_(t.link) + '">' + escHtml_(t.link) + "</a></td></tr>" : "") +
+    "</table>" +
+    (page ? '<p style="margin-top:20px"><a href="' + escHtml_(page) + '" style="background:#2a78d6;color:#fff;padding:9px 14px;border-radius:8px;text-decoration:none;font-weight:bold">İş Takip\'i aç</a></p>' : "") +
+    '<p style="color:#98a2b3;font-size:12px;margin-top:18px">Bu e-posta İş Takip tarafından gönderildi. Yanıtlayarak iletişime geçebilirsiniz.</p></div>';
+}
+
+// Görev atanınca / birim değişince (görev penceresindeki seçenekle) birim sorumlusuna e-posta
+function notifyAssign_(t, actor) {
+  const u = unitEmail_(t.unit);
+  if (!u.mail) {
+    t.notifyError = "Görev kaydedildi ama \"" + t.unit + "\" biriminin e-posta adresi yok. Birimleri yönet'ten ekleyin.";
+    return;
+  }
+  try {
+    sendMail_({
+      to: u.mail,
+      subject: "Yeni iş atandı: " + t.title + (t.due ? " · termin " + formatTr_(t.due) : ""),
+      htmlBody: taskCardHtml_(t, (u.owner ? u.owner + ", " : "") + "biriminize yeni bir iş atandı" + (actor ? " · " + actor : ""), "#0e2a3f")
+    });
+    t.notified = u.mail;
+    log_(actor, t.id, "E-posta", "Birim sorumlusuna bildirildi: " + u.mail);
+  } catch (err) {
+    t.notifyError = "Görev kaydedildi ama e-posta gönderilemedi: " + String((err && err.message) || err);
+  }
+}
+
+// Termini bugün olan açık işler için birim sorumlusuna "son gün" hatırlatması (birim başına tek e-posta)
+function sendLastDayReminders_(data, today) {
+  const byMail = {};
+  data.tasks.filter((t) => t.due === today && !t.done && t.status !== "İptal").forEach((t) => {
+    const u = data.unitInfo.find((x) => x.name === t.unit);
+    const mail = u ? String(u.email || "").trim().toLowerCase() : "";
+    if (!validEmail_(mail)) return;
+    (byMail[mail] = byMail[mail] || { owner: u.owner, list: [] }).list.push(t);
+  });
+  const sent = [];
+  Object.keys(byMail).forEach((mail) => {
+    const g = byMail[mail];
+    const body = g.list.length === 1
+      ? taskCardHtml_(g.list[0], (g.owner ? g.owner + ", " : "") + "bugün son gün", "#b42323")
+      : '<div style="font-family:Arial,sans-serif;max-width:600px;color:#142030">' +
+        '<div style="background:#b42323;color:#fff;padding:16px 20px;border-radius:12px"><div style="font-size:12px;opacity:.85">' +
+        escHtml_((g.owner ? g.owner + ", " : "") + formatTr_(today)) + '</div><div style="font-size:19px;font-weight:bold;margin-top:4px">Bugün son günü olan ' + g.list.length + " iş</div></div>" +
+        '<ul style="font-size:14px;line-height:1.7">' + g.list.map((t) => "<li><b>" + escHtml_(t.title) + "</b> · " + escHtml_(t.id) +
+          ([t.startTime, t.endTime].filter(Boolean).length ? " · " + escHtml_([t.startTime, t.endTime].filter(Boolean).join("–")) : "") + "</li>").join("") + "</ul></div>";
+    try {
+      sendMail_({
+        to: mail,
+        subject: "Hatırlatma: bugün son gün · " + (g.list.length === 1 ? g.list[0].title : g.list.length + " iş"),
+        htmlBody: body
+      });
+      sent.push(mail);
+    } catch (_) { /* bir alıcıda hata olsa da diğerleri gitsin */ }
+  });
+  return sent;
 }
 
 // ---- Takvim (Outlook dahil her takvime davet) -----------------------------------------

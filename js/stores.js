@@ -306,10 +306,10 @@
     // Birim yönetimi ve alt paketler Kod.gs'in 2. sürümüyle gelir.
     // 4. sürüm: geçmiş, yorumlar, aynı anda düzenleme koruması, tekrar ve bağlantı sütunları.
     get features() {
-      const v4 = this.version >= 4, v5 = this.version >= 5, v6 = this.version >= 6;
+      const v4 = this.version >= 4, v5 = this.version >= 5, v6 = this.version >= 6, v7 = this.version >= 7;
       return {
         units: this.version >= 2, subtasks: this.version >= 2, history: v4, conflicts: v4, repeat: v4, link: v4,
-        times: v5, email: v5, calendar: v6, needsUpdate: !v6
+        times: v5, email: v5, calendar: v6, notify: v7, needsUpdate: !v7
       };
     }
 
@@ -396,7 +396,7 @@
     }
 
     emailStatus() { return this.emailCall({ action: "emailStatus" }); }
-    emailEnable(time, unitEmails, to, calendar) { return this.emailCall({ action: "emailEnable", time, unitEmails, to, calendar }); }
+    emailEnable(o) { return this.emailCall({ action: "emailEnable", ...o }); }
     emailDisable() { return this.emailCall({ action: "emailDisable" }); }
     emailTest() { return this.emailCall({ action: "emailTest" }); }
   }

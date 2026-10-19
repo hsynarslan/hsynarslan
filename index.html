@@ -258,6 +258,10 @@
         <label data-feature="times">Bitiş saati
           <input name="endTime" type="time" step="300">
         </label>
+        <div class="full cal-row" data-feature="notify">
+          <label class="chip-toggle"><input id="notifyInput" type="checkbox"> Birim sorumlusuna e-posta gönder</label>
+          <span id="notifyState" class="cal-state"></span>
+        </div>
         <div class="full cal-row" data-feature="calendar">
           <label class="chip-toggle"><input id="calInput" type="checkbox"> Takvime ekle (Outlook'a davet gönder)</label>
           <span id="calState" class="cal-state"></span>
@@ -363,6 +367,14 @@
           <select id="emailTime"></select>
         </label>
         <label class="chip-toggle"><input id="emailCal" type="checkbox"> Bugünün saatli işleri için her sabah takvim daveti gönder (Outlook)</label>
+        <label class="chip-toggle" data-email-v7><input id="emailRemind" type="checkbox"> Son gün hatırlatması: termin günü sabahı birim sorumlusuna e-posta</label>
+        <label data-email-v7>Gönderen adı
+          <input id="emailSenderName" type="text" maxlength="80" placeholder="Hüseyin Arslan">
+        </label>
+        <label data-email-v7>Yanıtların geleceği adres
+          <input id="emailSender" type="text" inputmode="email" placeholder="ad.soyad@kurum.edu.tr">
+        </label>
+        <p id="senderHelp" class="form-help sender-help" data-email-v7></p>
         <label class="chip-toggle"><input id="emailUnits" type="checkbox"> Birim sorumlularına da kendi birimlerinin işlerini gönder</label>
       </div>
       <p id="emailError" class="form-error" role="alert" hidden></p>

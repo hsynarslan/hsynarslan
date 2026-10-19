@@ -112,7 +112,7 @@ Güvenlik:
 Sayfada **"Google tarafındaki kodu güncelleyin"** uyarısı görüyorsanız E-Tablodaki köprü kodunun yeni sürümü
 gerekiyor. Örneğin birim yönetimi ve alt paketler 2. sürümle; değişiklik geçmişi, yorumlar, aynı anda düzenleme
 koruması, tekrar eden görevler ve günlük e-posta 4. sürümle; saatlik takip (başlangıç/bitiş saati) ve siteden
-e-posta yönetimi 5. sürümle; alıcı adresi ve Outlook takvim davetleri 6. sürümle geldi. Verileriniz silinmez; yaklaşık 3 dakika sürer.
+e-posta yönetimi 5. sürümle; alıcı adresi ve Outlook takvim davetleri 6. sürümle; atama bildirimi, son gün hatırlatması ve gönderen adı 7. sürümle geldi. Verileriniz silinmez; yaklaşık 3 dakika sürer.
 
 1. E-Tablonuzu açın ve **Uzantılar → Apps Script** yolunu izleyin.
 2. Kod alanındaki her şeyi silin (Ctrl+A, ardından Delete).
@@ -147,6 +147,17 @@ E-Tablo her sabah size **bugün yapılması gerekenleri** e-postayla gönderir: 
 - **Bugünün saatli işleri için takvim daveti gönder:** işaretlenirse sabah e-postasıyla birlikte, bugünün saatli
   işleri için (henüz takvimde değilse) alıcıya takvim daveti gider.
 - İsterseniz birim sorumlularına da (Birimler sayfasındaki **E-posta** sütunu) kendi birimlerinin işleri gider.
+- **Son gün hatırlatması:** işaretlenirse termin günü sabahı, işin birim sorumlusuna "bugün son gün" e-postası gider
+  (birim başına tek e-posta). Günlük e-postanın açık olması gerekir.
+- **Gönderen adı** ve **yanıtların geleceği adres:** E-postalar Google hesabınızdan gider ama alıcı gönderen olarak
+  yazdığınız adı (ör. *Hüseyin Arslan*) görür; **Yanıtla** dediğinde yanıt yazdığınız adrese (ör. kurum e-postanız) gelir.
+
+## Görev atanınca birim sorumlusuna e-posta
+
+Görev penceresindeki **Birim sorumlusuna e-posta gönder** işaretlenirse görev kaydedilince birimin sorumlusuna
+(Birimler sayfasındaki **E-posta**) "Yeni iş atandı" e-postası gider: iş, termin, saat, öncelik, not ve bağlantı.
+- Yeni görevde son seçiminiz hatırlanır; mevcut bir görevde birimi değiştirirseniz seçenek kendiliğinden işaretlenir.
+- Birimin e-posta adresi yoksa seçenek kapalıdır; **Birimleri yönet**'ten adres ekleyin.
 
 ## Outlook takvimine ekleme
 
