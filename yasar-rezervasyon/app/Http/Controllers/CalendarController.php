@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Closure;
 use App\Models\Facility;
 use App\Models\Holiday;
+use App\Models\Reservation;
 use App\Services\Availability;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
@@ -78,6 +79,9 @@ class CalendarController extends Controller
             return ['state' => $start->lt(now()) ? 'past' : 'free', 'label' => ''];
         };
 
-        return view('calendar.index', compact('facilities', 'facility', 'date', 'view', 'days', 'slotMinutes', 'cell', 'canSeeNames', 'canBook'));
+        $next = Reservation::with('facility', 'activity', 'units')->involving($user->id)->active()
+            ->where('kind', '!=', 'block')->where('ends_at', '>', now())->orderBy('starts_at')->first();
+
+        return view('calendar.index', compact('facilities', 'facility', 'date', 'view', 'days', 'slotMinutes', 'cell', 'canSeeNames', 'canBook', 'next'));
     }
 }

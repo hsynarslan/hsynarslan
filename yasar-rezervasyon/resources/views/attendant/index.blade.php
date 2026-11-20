@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', __('Günlük Liste'))
 @section('content')
-<div class="page-head"><h1>{{ __('Günlük Liste') }}</h1></div>
+<div class="page-head"><div><h1>{{ __('Günlük Liste') }}</h1><p class="lead">{{ __('Katılımı işaretleyin, ekipmanı teslim edin ve teslim alın.') }}</p></div></div>
 <form method="get" class="card form-row">
     <div class="field"><label for="a-f">{{ __('Tesis') }}</label>
         <select id="a-f" name="facility" data-autosubmit>@foreach ($facilities as $f)<option value="{{ $f->id }}" @selected($facility?->id === $f->id)>{{ $f->name }}</option>@endforeach</select></div>
@@ -13,8 +13,8 @@
         <div class="card-head">
             <div>
                 <div class="actions">
-                    <strong class="nowrap">{{ $r->starts_at->format('H:i') }}–{{ $r->ends_at->format('H:i') }}</strong>
-                    <span>{{ $r->title() }}</span>
+                    <span class="badge badge-info badge-plain">@icon('clock', 14) {{ $r->starts_at->format('H:i') }}–{{ $r->ends_at->format('H:i') }}</span>
+                    <strong>{{ $r->title() }}</strong>
                     <span class="badge">{{ $r->units->map->name->join(', ') }}</span>
                     @if ($r->attendance)<span class="badge badge-{{ $r->attendance }}">{{ $r->attendance === 'attended' ? __('Geldi') : __('Gelmedi') }}</span>@endif
                 </div>
@@ -34,7 +34,7 @@
             @endunless
         </div>
         @foreach ($r->equipmentItems as $item)
-            <div class="actions mt small">
+            <div class="actions mt small form-section">
                 <strong>{{ $item->quantity }} × {{ $item->equipment->name }}</strong>
                 @if (! $item->delivered_at)
                     <form method="post" action="{{ route('attendant.equipment', $item) }}">@csrf<input type="hidden" name="action" value="deliver">
@@ -55,6 +55,6 @@
         @endforeach
     </article>
 @empty
-    <div class="card muted">{{ __('Bu gün için onaylı rezervasyon yok.') }}</div>
+    <div class="card empty">@icon('clipboard', 36)<p>{{ __('Bu gün için onaylı rezervasyon yok.') }}</p></div>
 @endforelse
 @endsection

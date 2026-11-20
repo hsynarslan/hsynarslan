@@ -1,10 +1,13 @@
 @extends('layouts.app')
 @section('title', __('Giriş (QR)'))
 @section('content')
-<div class="card">
+<div class="narrow">
+<div class="card empty">
+    <span class="icon-badge">@icon('qr', 24)</span>
     <h1>{{ $facility->name }}</h1>
-    <p>{{ __('Rezervasyonunuza giriş yapmak için onaylayın.') }}</p>
+    <p class="lead">{{ __('Rezervasyonunuza giriş yapmak için onaylayın.') }}</p>
     <form method="post" action="{{ route('checkin.store', $token) }}">@csrf
-        <button class="btn btn-primary" type="submit">{{ __('Girişimi kaydet') }}</button></form>
+        <button class="btn btn-primary btn-lg" type="submit">@icon('check') {{ __('Girişimi kaydet') }}</button></form>
+</div>
 </div>
 @endsection

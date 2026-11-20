@@ -8,6 +8,7 @@ use App\Services\Ldap\NativeDirectory;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -33,6 +34,7 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Blade::directive('icon', fn (string $expression) => "<?php echo \\App\\Support\\Icon::svg($expression); ?>");
         Paginator::defaultView('vendor.pagination.simple');
         Paginator::defaultSimpleView('vendor.pagination.simple');
 

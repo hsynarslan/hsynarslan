@@ -1,11 +1,15 @@
 @extends('layouts.app')
 @section('title', __('Yeni rezervasyon'))
 @section('content')
-<div class="page-head"><h1>{{ __('Yeni rezervasyon talebi') }}</h1>
-    <a class="btn" href="{{ route('calendar', ['facility' => $facility->id, 'date' => $date->toDateString()]) }}">{{ __('Takvime dön') }}</a></div>
+<div class="page-head">
+    <div><span class="eyebrow">{{ __('Yeni rezervasyon') }}</span><h1>{{ __('Rezervasyon talebi oluştur') }}</h1>
+        <p class="lead">{{ __('Talebiniz SKS onayından sonra kesinleşir.') }}</p></div>
+    <a class="btn" href="{{ route('calendar', ['facility' => $facility->id, 'date' => $date->toDateString()]) }}">@icon('chevron-left', 16) {{ __('Takvime dön') }}</a>
+</div>
 
-<div class="grid grid-2">
+<div class="grid grid-aside">
 <div class="card">
+    <h2 class="card-title"><span class="icon-badge">@icon('calendar')</span>{{ __('Ne zaman, nerede?') }}</h2>
     <form method="get" action="{{ route('reservations.create') }}" class="form-row">
         <div class="field">
             <label for="f-facility">{{ __('Tesis') }}</label>
@@ -30,6 +34,7 @@
         <input type="hidden" name="facility_id" value="{{ $facility->id }}">
         <input type="hidden" name="date" value="{{ $date->toDateString() }}">
 
+        <div class="form-section"></div>
         <div class="field">
             <label for="activity">{{ __('Aktivite') }}</label>
             <select id="activity" name="activity_type_id" required>
@@ -100,7 +105,7 @@
         @endif
 
         @if ($facility->equipment->where('is_active', true)->isNotEmpty())
-            <h3>{{ __('Ekipman') }}</h3>
+            <h3 class="card-title form-section"><span class="icon-badge amber">@icon('package')</span>{{ __('Ekipman') }}</h3>
             <div class="form-row">
                 @foreach ($facility->equipment->where('is_active', true) as $eq)
                     <div class="field">
@@ -117,20 +122,29 @@
             <textarea id="notes" name="notes" maxlength="500">{{ old('notes') }}</textarea>
         </div>
 
-        <button class="btn btn-primary" type="submit">{{ __('Talep gönder') }}</button>
+        <button class="btn btn-primary btn-lg" type="submit">@icon('check') {{ __('Talep gönder') }}</button>
     </form>
     @endif
 </div>
 
-<div class="card">
-    <h2 class="mt-0">{{ $facility->name }}</h2>
-    @if ($facility->localized('description'))<p>{{ $facility->localized('description') }}</p>@endif
-    <ul class="small">
-        <li>{{ __('Talepler SKS onayından sonra kesinleşir. Başlangıç saatine kadar onaylanmayan talepler otomatik iptal edilir.') }}</li>
-        <li>{{ __('Seçtiğiniz saat, talebiniz beklemedeyken başkalarına kapalıdır.') }}</li>
-        <li>{{ __('İptal: başlangıçtan en geç :h saat önce. Daha sonraki iptaller geç iptal sayılır.', ['h' => $facility->cancel_deadline_hours]) }}</li>
-        <li>{{ __('Tesise girişte QR kodu okutun; ilk :m dakikada giriş yapılmazsa "gelmedi" sayılır.', ['m' => \App\Models\Setting::get('noshow_grace_minutes')]) }}</li>
+<aside class="card summary-card">
+    <div class="summary-head">
+        <span class="fac-icon">{!! \App\Support\Icon::svg(\App\Support\Icon::forFacility($facility->name_tr), 22) !!}</span>
+        <div><strong>{{ $facility->name }}</strong><div class="muted small">{{ $date->locale(app()->getLocale())->isoFormat('D MMMM YYYY, dddd') }}</div></div>
+    </div>
+    @if ($facility->localized('description'))<p class="small muted">{{ $facility->localized('description') }}</p>@endif
+    <dl class="kv">
+        <dt>{{ __('Kapasite') }}</dt><dd>{{ $facility->capacity }} {{ __('kişi') }}</dd>
+        <dt>{{ __('Slot') }}</dt><dd>{{ $facility->slot_minutes }} {{ __('dk') }}</dd>
+        <dt>{{ __('Alanlar') }}</dt><dd>{{ $facility->units->map->name->join(', ') }}</dd>
+        <dt>{{ __('Grup') }}</dt><dd>{{ $facility->group_allowed ? __('Açık') : __('Kapalı') }}</dd>
+    </dl>
+    <ul class="list-plain">
+        <li>@icon('check-circle', 16)<span>{{ __('Talepler SKS onayından sonra kesinleşir. Başlangıç saatine kadar onaylanmayan talepler otomatik iptal edilir.') }}</span></li>
+        <li>@icon('lock', 16)<span>{{ __('Seçtiğiniz saat, talebiniz beklemedeyken başkalarına kapalıdır.') }}</span></li>
+        <li>@icon('clock', 16)<span>{{ __('İptal: başlangıçtan en geç :h saat önce. Daha sonraki iptaller geç iptal sayılır.', ['h' => $facility->cancel_deadline_hours]) }}</span></li>
+        <li>@icon('qr', 16)<span>{{ __('Tesise girişte QR kodu okutun; ilk :m dakikada giriş yapılmazsa "gelmedi" sayılır.', ['m' => \App\Models\Setting::get('noshow_grace_minutes')]) }}</span></li>
     </ul>
-</div>
+</aside>
 </div>
 @endsection

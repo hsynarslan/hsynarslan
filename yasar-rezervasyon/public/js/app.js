@@ -27,6 +27,12 @@
     }
   }
   if (start) { start.addEventListener("change", syncEnd); syncEnd(); }
+  // Mobil kenar menü
+  document.addEventListener("click", function (e) {
+    if (e.target.closest("[data-sidebar-open]")) document.body.classList.add("nav-open");
+    if (e.target.closest("[data-sidebar-close]")) document.body.classList.remove("nav-open");
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") document.body.classList.remove("nav-open"); });
   // Yazdır düğmesi
   document.addEventListener("click", function (e) {
     if (e.target.closest("[data-print]")) { e.preventDefault(); window.print(); }
