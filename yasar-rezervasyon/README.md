@@ -11,6 +11,7 @@ SKS'nin onayladığı web uygulaması. PHP 8.3 + Laravel 13 + MySQL 8. Mobil uyu
 | [02 – Veritabanı](docs/02-veritabani.md) | ER diyagramı ve tablolar |
 | [03 – Ekran akışları](docs/03-ekran-akislari.md) | Roller, menüler, ekranlar |
 | [04 – ISO 27001](docs/04-iso27001.md) | Kontrol eşlemesi ve üretim kontrol listesi |
+| [Kullanım kılavuzu](docs/kullanici-kilavuzu/index.html) | Rollere göre, numaralı ekran görüntüleriyle adım adım kılavuz (tarayıcıda açın) |
 
 ## Hızlı başlangıç (geliştirme)
 

@@ -1,0 +1,626 @@
+<title>YÜ Rezervasyon Kullanım Kılavuzu</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+/* Düzen: solda sabit içindekiler, sağda rol bölümleri; her adım = metin + numaralı ekran görüntüsü. Uygulamanın lacivert/turuncu kimliğiyle aynı. */
+:root {
+  --bg: #f4f6fb; --surface: #ffffff; --surface-2: #f1f4fa; --ink: #0e1a33; --ink-2: #344260; --muted: #64708a;
+  --border: #e1e6f0; --brand: #1a3f8f; --brand-2: #2453b8; --brand-soft: #edf2fd; --navy: #0d2152;
+  --mark: #f97316; --mark-soft: #fff1e6; --ok: #12805c; --ok-soft: #e5f6ee; --warn: #a35c00; --warn-soft: #fff3df;
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1120; --surface: #121a2c; --surface-2: #182136; --ink: #e9eef8; --ink-2: #c3cbdc; --muted: #8f9ab2;
+    --border: #253049; --brand: #8eb0ff; --brand-2: #a8c2ff; --brand-soft: #1a2747; --navy: #0a1430;
+    --mark: #fb8a3c; --mark-soft: #3a2412; --ok: #5fd3a3; --ok-soft: #11312a; --warn: #f4c06a; --warn-soft: #352712; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1120; --surface: #121a2c; --surface-2: #182136; --ink: #e9eef8; --ink-2: #c3cbdc; --muted: #8f9ab2;
+  --border: #253049; --brand: #8eb0ff; --brand-2: #a8c2ff; --brand-soft: #1a2747; --navy: #0a1430;
+  --mark: #fb8a3c; --mark-soft: #3a2412; --ok: #5fd3a3; --ok-soft: #11312a; --warn: #f4c06a; --warn-soft: #352712; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.65 var(--font); -webkit-font-smoothing: antialiased; }
+a { color: var(--brand-2); }
+h1, h2, h3 { text-wrap: balance; letter-spacing: -.02em; line-height: 1.2; }
+
+.hero { background: linear-gradient(150deg, #0d2152 0%, #1a3f8f 100%); color: #fff;
+  margin-top: calc(-1 * env(safe-area-inset-top, 0px)); padding-top: calc(env(safe-area-inset-top, 0px) + 3rem); padding-bottom: 3rem; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.brand { display: flex; align-items: center; gap: .7rem; font-weight: 600; font-size: .95rem; color: #dbe5ff; }
+.brand b { width: 40px; height: 40px; border-radius: 11px; background: #fff; color: #0d2152; display: grid; place-items: center; font-weight: 800; }
+.hero h1 { font-size: clamp(2rem, 4vw, 2.9rem); margin: 1.6rem 0 .6rem; color: #fff; max-width: 22ch; }
+.hero p { color: #c8d5f5; font-size: 1.08rem; max-width: 62ch; margin: 0; }
+.roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .75rem; margin-top: 2rem; }
+.role { display: block; padding: .9rem 1rem; border-radius: 14px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); color: #fff; text-decoration: none; transition: background .15s; }
+.role:hover { background: rgba(255,255,255,.15); }
+.role strong { display: block; font-size: .98rem; }
+.role span { color: #b9c8ee; font-size: .84rem; line-height: 1.45; display: block; margin-top: .2rem; }
+
+.layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 2.5rem; padding-block: 2.5rem 4rem; }
+.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 1.25rem); align-self: start; max-height: calc(100vh - 2.5rem); overflow-y: auto; font-size: .9rem; }
+.toc p { margin: 1.1rem 0 .35rem; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.toc p:first-child { margin-top: 0; }
+.toc a { display: block; padding: .28rem .6rem; border-radius: 8px; color: var(--ink-2); text-decoration: none; }
+.toc a:hover { background: var(--surface-2); color: var(--ink); }
+
+.part { margin-bottom: 3.5rem; scroll-margin-top: 1rem; }
+.part-head { display: flex; align-items: center; gap: .9rem; padding-bottom: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); }
+.part-head .tag { font-size: .74rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--brand-2); background: var(--brand-soft); padding: .25rem .6rem; border-radius: 999px; white-space: nowrap; }
+.part-head h2 { margin: 0; font-size: 1.7rem; }
+.part > p.intro { color: var(--ink-2); max-width: 70ch; margin: -.5rem 0 1.5rem; }
+
+.step { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 1.5rem; margin-bottom: 1.5rem; scroll-margin-top: 1rem; }
+.step-head { display: flex; gap: .9rem; align-items: flex-start; margin-bottom: .9rem; }
+.step-no { flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--navy); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: .95rem; }
+.step h3 { margin: .2rem 0 0; font-size: 1.22rem; }
+.step > p { color: var(--ink-2); max-width: 72ch; margin: 0 0 1rem; }
+.shot { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1.25rem; align-items: start; }
+.shot.wide { grid-template-columns: minmax(0, 1fr); }
+.shot.phone { grid-template-columns: repeat(2, minmax(0, 260px)) minmax(0, 1fr); }
+.shot img { width: 100%; max-width: 100%; height: auto; display: block; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 10px 30px -18px rgba(13, 33, 82, .45); background: var(--surface-2); }
+.keys { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .7rem; }
+.keys li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: .65rem; font-size: .93rem; color: var(--ink-2); line-height: 1.5; }
+.keys b { width: 26px; height: 26px; border-radius: 50%; background: var(--mark); color: #fff; display: grid; place-items: center; font-size: .8rem; font-weight: 700; box-shadow: 0 0 0 3px var(--mark-soft); }
+.keys strong { color: var(--ink); font-weight: 600; }
+
+.note { display: flex; gap: .75rem; padding: .9rem 1.1rem; border-radius: 12px; font-size: .93rem; margin-top: 1rem; max-width: 80ch; }
+.note::before { content: "i"; flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: .8rem; font-style: italic; }
+.note.tip { background: var(--ok-soft); color: var(--ok); } .note.tip::before { background: var(--ok); color: var(--surface); }
+.note.warn { background: var(--warn-soft); color: var(--warn); } .note.warn::before { content: "!"; font-style: normal; background: var(--warn); color: var(--surface); }
+
+.colors { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .6rem; margin: 1rem 0 0; padding: 0; list-style: none; }
+.colors li { display: flex; align-items: center; gap: .6rem; font-size: .9rem; color: var(--ink-2); background: var(--surface-2); border-radius: 10px; padding: .55rem .75rem; }
+.sw { width: 18px; height: 18px; border-radius: 5px; border-left: 4px solid; flex: none; }
+.sw.free { background: var(--surface); border: 1px dashed var(--muted); }
+.sw.mine { background: #e5f6ee; border-color: #12805c; } .sw.pend { background: #fff3df; border-color: #f5a524; }
+.sw.appr { background: #edf2fd; border-color: #2453b8; } .sw.block { background: #efeafd; border-color: #5b3fc4; }
+.sw.closed { background: repeating-linear-gradient(135deg, #e4e8f0 0 4px, #f4f6fb 4px 8px); border-color: #c4ccdb; }
+
+table.rules { width: 100%; border-collapse: collapse; font-size: .92rem; }
+.rules th, .rules td { text-align: left; padding: .6rem .75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.rules th { font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; background: var(--surface-2); }
+.rules td:first-child { font-weight: 600; color: var(--ink); white-space: nowrap; }
+.table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+
+.faq details { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: .95rem 1.2rem; margin-bottom: .7rem; }
+.faq summary { cursor: pointer; font-weight: 600; }
+.faq details p { margin: .6rem 0 0; color: var(--ink-2); max-width: 75ch; }
+footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--border); padding-block: 1.5rem 2.5rem; }
+
+@media (max-width: 1080px) { .shot, .shot.phone { grid-template-columns: minmax(0, 1fr); } .shot.phone .pair { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; } }
+@media (min-width: 1081px) { .shot.phone .pair { display: contents; } }
+@media (max-width: 860px) { .layout { grid-template-columns: minmax(0, 1fr); } .toc { position: static; max-height: none; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1rem; } .step { padding: 1.1rem; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="brand"><b>YÜ</b> Yaşar Üniversitesi · Tesis Rezervasyonu</div>
+    <h1>Kullanım Kılavuzu</h1>
+    <p>Spor salonu, dans salonu ve çalışma odalarını nasıl rezerve edeceğinizi ekran ekran anlatır. Ekran görüntülerindeki turuncu numaralar, hemen yanındaki açıklamalarla eşleşir. Kendi rolünüzün bölümünden başlayın.</p>
+    <nav class="roles" aria-label="Rollere göre bölümler">
+      <a class="role" href="#herkes"><strong>Öğrenci, Personel, Mezun</strong><span>Giriş, takvim, rezervasyon, iptal, QR ile giriş</span></a>
+      <a class="role" href="#antrenor"><strong>Antrenör</strong><span>Takım rezervasyonu ve oyuncu bilgileri</span></a>
+      <a class="role" href="#onayci"><strong>SKS Onaycısı</strong><span>Talepleri onaylama, reddetme, raporlar</span></a>
+      <a class="role" href="#gorevli"><strong>Salon Görevlisi</strong><span>Katılım ve ekipman takibi</span></a>
+      <a class="role" href="#admin"><strong>SKS Admin</strong><span>Tesis, kural, blok, kapatma ve kullanıcı yönetimi</span></a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <nav class="toc" aria-label="İçindekiler">
+    <p>Herkes</p>
+    <a href="#giris">1. Giriş yapma</a>
+    <a href="#kvkk">2. KVKK onayı</a>
+    <a href="#takvim">3. Takvimi okuma</a>
+    <a href="#hafta">4. Hafta görünümü</a>
+    <a href="#talep">5. Rezervasyon talebi</a>
+    <a href="#durum">6. Rezervasyonlarım</a>
+    <a href="#limit">7. Uyarı mesajları</a>
+    <a href="#grup">8. Grup ve katılımcılar</a>
+    <a href="#qr">9. QR ile giriş</a>
+    <a href="#kurallar">Kurallar özeti</a>
+    <p>Antrenör</p>
+    <a href="#takim-rez">10. Takım rezervasyonu</a>
+    <a href="#takimlar">11. Takımlarım</a>
+    <a href="#oyuncu">12. Oyuncu ekleme</a>
+    <p>SKS Onaycısı</p>
+    <a href="#onay">13. Onaylama</a>
+    <a href="#red">14. Reddetme</a>
+    <a href="#rapor">15. Raporlar</a>
+    <p>Salon Görevlisi</p>
+    <a href="#gunluk">16. Günlük liste</a>
+    <p>SKS Admin</p>
+    <a href="#tesis-liste">17. Tesisler</a>
+    <a href="#tesis-genel">18. Tesis ayarları</a>
+    <a href="#tesis-birim">19. Birimler ve saatler</a>
+    <a href="#tesis-aktivite">20. Aktiviteler</a>
+    <a href="#tesis-kural">21. Kurallar ve onaycılar</a>
+    <a href="#tesis-qr">22. QR kodu</a>
+    <a href="#blok">23. Sabit bloklar</a>
+    <a href="#kapatma">24. Kapatmalar</a>
+    <a href="#tatil">25. Resmi tatiller</a>
+    <a href="#kullanici">26. Kullanıcılar ve roller</a>
+    <a href="#ayarlar">27. Ayarlar</a>
+    <a href="#islem">28. İşlem kaydı</a>
+    <p>Yardım</p>
+    <a href="#sss">Sık sorulan sorular</a>
+  </nav>
+
+  <main>
+    <!-- ================= HERKES ================= -->
+    <section class="part" id="herkes">
+      <div class="part-head"><span class="tag">Herkes</span><h2>Öğrenci, Personel ve Mezunlar</h2></div>
+      <p class="intro">Bu bölümdeki adımlar sistemi kullanan herkes için geçerlidir. Antrenörler, onaycılar ve görevliler de rezervasyonlarını aynı şekilde yapar.</p>
+
+      <article class="step" id="giris">
+        <div class="step-head"><span class="step-no">1</span><h3>Giriş yapma</h3></div>
+        <p>Tarayıcıda sistemin adresini açın. Ayrı bir kayıt gerekmez; üniversitenin diğer sistemlerinde kullandığınız hesapla giriş yaparsınız.</p>
+        <figure class="shot">
+          <img src="img/giris.jpg" alt="Giriş ekranı: kullanıcı adı, şifre ve giriş düğmesi" loading="lazy" width="2560" height="1520">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Kullanıcı adı:</strong> Üniversite hesabınızın kullanıcı adı (e-posta adresinizin @ işaretinden önceki kısmı).</span></li>
+            <li><b>2</b><span><strong>Şifre:</strong> Üniversite hesabınızın şifresi. Şifreniz bu sistemde saklanmaz.</span></li>
+            <li><b>3</b><span><strong>Giriş yap</strong> düğmesine basın.</span></li>
+            <li><b>4</b><span>Arayüzü <strong>İngilizce</strong> kullanmak için buraya tıklayın. Tercihiniz hatırlanır ve e-postalarınız da bu dilde gelir.</span></li>
+          </ol>
+        </figure>
+        <p class="note warn">Bir dakika içinde 5 kez hatalı şifre girerseniz güvenlik nedeniyle kısa bir süre beklemeniz gerekir. Şifrenizi unuttuysanız Bilgi İşlem'e başvurun.</p>
+      </article>
+
+      <article class="step" id="kvkk">
+        <div class="step-head"><span class="step-no">2</span><h3>KVKK aydınlatma metnini onaylama</h3></div>
+        <p>İlk girişinizde ve metin güncellendiğinde bu ekran açılır. Onaylamadan sistemi kullanamazsınız.</p>
+        <figure class="shot">
+          <img src="img/kvkk.jpg" alt="KVKK aydınlatma metni ve onay kutusu" loading="lazy" width="2560" height="1520">
+          <ol class="keys">
+            <li><b>1</b><span>Aydınlatma metnini okuyun. Hangi verilerinizin neden ve ne kadar süre işlendiğini anlatır.</span></li>
+            <li><b>2</b><span><strong>Onay kutusunu</strong> işaretleyin.</span></li>
+            <li><b>3</b><span><strong>Onayla ve devam et</strong> düğmesine basın.</span></li>
+          </ol>
+        </figure>
+      </article>
+
+      <article class="step" id="takvim">
+        <div class="step-head"><span class="step-no">3</span><h3>Takvimi okuma ve boş saat bulma</h3></div>
+        <p>Girişten sonra açılan ana ekran takvimdir. Gün görünümünde her sütun tesisin bir bölümünü gösterir. Örneğin spor salonunda Pota A ve Pota B ayrı sütunlardır.</p>
+        <figure class="shot">
+          <img src="img/takvim-gun.jpg" alt="Gün görünümünde spor salonu takvimi" loading="lazy" width="2560" height="2360">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Sıradaki rezervasyonunuz.</strong> En yakın rezervasyonunuzu ve durumunu gösterir. Tıklayınca Rezervasyonlarım sayfası açılır.</span></li>
+            <li><b>2</b><span><strong>Tesis seçimi.</strong> Hangi tesisin takvimini görmek istediğinizi seçin. Kartta kapasite ve slot süresi yazar.</span></li>
+            <li><b>3</b><span><strong>Gün değiştirme.</strong> Oklarla önceki ve sonraki güne geçin. Sağdaki tarih kutusundan belirli bir güne de atlayabilirsiniz.</span></li>
+            <li><b>4</b><span><strong>Gün / Hafta</strong> görünümü arasında geçiş yapın.</span></li>
+            <li><b>5</b><span><strong>Boş saat.</strong> Silik <strong>+</strong> işareti olan hücreler boştur. Tıkladığınızda rezervasyon formu o saat ve o bölüm seçili olarak açılır.</span></li>
+            <li><b>6</b><span><strong>Dolu saat.</strong> Kart, birden fazla saate yayılan rezervasyonları tek parça gösterir. Başkalarının adı görünmez, yalnızca aktivite ve durum görünür.</span></li>
+          </ol>
+        </figure>
+        <ul class="colors" aria-label="Renklerin anlamı">
+          <li><span class="sw free"></span>Boş, rezerve edilebilir</li>
+          <li><span class="sw mine"></span>Sizin rezervasyonunuz</li>
+          <li><span class="sw pend"></span>Beklemede (onay bekliyor)</li>
+          <li><span class="sw appr"></span>Onaylı</li>
+          <li><span class="sw block"></span>Takım antrenmanı / sabit blok</li>
+          <li><span class="sw closed"></span>Kapalı, tatil veya geçmiş</li>
+        </ul>
+        <p class="note tip">Beklemedeki bir talep de o saati kapatır. İlk talep eden hakkı alır; ikinci kişi aynı saati seçemez.</p>
+      </article>
+
+      <article class="step" id="hafta">
+        <div class="step-head"><span class="step-no">4</span><h3>Hafta görünümü</h3></div>
+        <p>Bütün haftayı tek ekranda görmek için <strong>Hafta</strong> düğmesine basın. Her hücre o saatte kaç bölümün boş olduğunu gösterir.</p>
+        <figure class="shot">
+          <img src="img/takvim-hafta.jpg" alt="Hafta görünümü" loading="lazy" width="2560" height="2360">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Gün başlığı.</strong> Tıklayınca o günün ayrıntılı gün görünümü açılır.</span></li>
+            <li><b>2</b><span><strong>2/2 boş:</strong> İki potanın ikisi de boş. Tam salon (ör. voleybol) için uygundur.</span></li>
+            <li><b>3</b><span><strong>1/2 boş:</strong> Bir pota dolu. Yalnızca tek pota gerektiren aktiviteler yapılabilir.</span></li>
+            <li><b>4</b><span><strong>Dolu:</strong> Bu saatte boş bölüm yok.</span></li>
+            <li><b>5</b><span><strong>Taralı hücre:</strong> Tesis kapalı (çalışma saati dışı, tatil veya bakım).</span></li>
+          </ol>
+        </figure>
+      </article>
+
+      <article class="step" id="talep">
+        <div class="step-head"><span class="step-no">5</span><h3>Rezervasyon talebi oluşturma</h3></div>
+        <p>Takvimde boş bir hücreye tıklayın ya da menüden <strong>Yeni rezervasyon</strong>'u seçin. Form açıldığında tesis, tarih ve saat seçili gelir.</p>
+        <figure class="shot">
+          <img src="img/form.jpg" alt="Rezervasyon formu" loading="lazy" width="2560" height="2120">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Tesis ve tarih.</strong> Değiştirirseniz form o güne göre yenilenir.</span></li>
+            <li><b>2</b><span><strong>Aktivite.</strong> Yalnızca rolünüze açık aktiviteler listelenir. Yanında kaç bölüm kullanacağı yazar (ör. "1 birim" = tek pota).</span></li>
+            <li><b>3</b><span><strong>Başlangıç ve bitiş.</strong> Saatler tesisin slot süresine göre (30 veya 60 dakika) listelenir. Bir rezervasyon en fazla 2 saat sürebilir.</span></li>
+            <li><b>4</b><span><strong>Tercih edilen alan.</strong> İsterseniz belirli bir potayı seçin. "Fark etmez" derseniz sistem boş olanı verir.</span></li>
+            <li><b>5</b><span><strong>Kişi sayısı.</strong> Grup rezervasyonuna açık tesislerde kaç kişi geleceğinizi yazın. Kapasite altında gösterilir.</span></li>
+            <li><b>6</b><span><strong>Ekipman.</strong> Top, mat gibi ödünç almak istediğiniz malzemenin adedini girin. Stok o saat için kontrol edilir.</span></li>
+            <li><b>7</b><span><strong>Özet ve kurallar.</strong> Tesisin kapasitesi, bölümleri, iptal süresi ve QR ile giriş kuralı burada yazar.</span></li>
+          </ol>
+        </figure>
+        <figure class="shot">
+          <img src="img/form-2.jpg" alt="Formun alt kısmı: not alanı ve gönder düğmesi" loading="lazy" width="2560" height="2120">
+          <ol class="keys" start="8">
+            <li><b>8</b><span><strong>Not.</strong> SKS'ye iletmek istediğiniz kısa bir açıklama (isteğe bağlı).</span></li>
+            <li><b>9</b><span><strong>Talep gönder.</strong> Talebiniz SKS onayına düşer ve onaycılara e-posta gider.</span></li>
+          </ol>
+        </figure>
+      </article>
+
+      <article class="step" id="durum">
+        <div class="step-head"><span class="step-no">6</span><h3>Rezervasyonlarım: durum takibi ve iptal</h3></div>
+        <p>Talep gönderildikten sonra bu sayfa açılır. Durum değiştiğinde (onay, red, iptal) ayrıca e-posta alırsınız.</p>
+        <figure class="shot">
+          <img src="img/rezervasyonlarim.jpg" alt="Rezervasyonlarım sayfası" loading="lazy" width="2560" height="1800">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Talep kodu.</strong> SKS ile yazışırken bu kodu kullanın (ör. YR-2026-000012).</span></li>
+            <li><b>2</b><span><strong>Sekmeler:</strong> Yaklaşan, Geçmiş ve sizi katılımcı olarak ekleyenlerin rezervasyonları.</span></li>
+            <li><b>3</b><span><strong>Tarih kutusu</strong> ve altında saat, alan, kişi sayısı, ekipman bilgileri.</span></li>
+            <li><b>4</b><span><strong>Durum:</strong> <em>Beklemede</em> (onay bekliyor), <em>Onaylandı</em>, <em>Reddedildi</em> (gerekçe yazar), <em>İptal</em> veya <em>Süresi doldu</em> (başlangıç saatine kadar onaylanmadı).</span></li>
+            <li><b>5</b><span><strong>Geri çek / İptal et.</strong> Beklemedeki talebi her zaman geri çekebilirsiniz. Onaylı rezervasyonu iptal süresinden sonra iptal ederseniz <strong>geç iptal</strong> sayılır.</span></li>
+          </ol>
+        </figure>
+        <p class="note warn">30 gün içinde toplam 3 kez gelmezseniz ya da geç iptal ederseniz 14 gün boyunca rezervasyon yapamazsınız. Yasak süresi bu sayfanın üstünde kırmızı bir uyarıyla gösterilir.</p>
+      </article>
+
+      <article class="step" id="limit">
+        <div class="step-head"><span class="step-no">7</span><h3>Uyarı mesajları</h3></div>
+        <p>Talebiniz bir kurala takılırsa form gönderilmez ve sayfanın üstünde nedeni yazar. Örneğin aynı gün aynı tesis için ikinci bir rezervasyon yapmaya çalıştığınızda:</p>
+        <figure class="shot">
+          <img src="img/hata.jpg" alt="Günlük sınır uyarısı" loading="lazy" width="2024" height="720">
+          <ol class="keys">
+            <li><b>1</b><span>Mesaj hangi kuralın engellediğini söyler. Takvimden başka bir gün, saat veya tesis seçerek tekrar deneyin.</span></li>
+          </ol>
+        </figure>
+      </article>
+
+      <article class="step" id="grup">
+        <div class="step-head"><span class="step-no">8</span><h3>Grup rezervasyonu ve katılımcılar</h3></div>
+        <p>Dans salonu gibi bazı tesislerde katılımcıların listesi zorunludur. Bu tesislerde formda kişi sayısı yerine bir katılımcı alanı çıkar.</p>
+        <figure class="shot">
+          <img src="img/katilimci-form.jpg" alt="Katılımcı numaraları alanı" loading="lazy" width="2560" height="2000">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Katılımcılar.</strong> Her satıra bir öğrenci veya personel numarası yazın. Katılımcılara e-posta gider ve bu rezervasyon <strong>onların günlük ve haftalık sınırından da düşer</strong>.</span></li>
+            <li><b>2</b><span>Ekipmanı burada da isteyebilirsiniz (ör. pilates matı).</span></li>
+          </ol>
+        </figure>
+        <p>Biri sizi katılımcı olarak eklediyse rezervasyon <strong>Katılımcı olduklarım</strong> sekmesinde görünür:</p>
+        <figure class="shot">
+          <img src="img/katilimci-oldugum.jpg" alt="Katılımcı olduklarım sekmesi" loading="lazy" width="2024" height="840">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Katılımcı olduklarım</strong> sekmesi.</span></li>
+            <li><b>2</b><span>Rezervasyonu yapan kişi ve ayrıntılar.</span></li>
+            <li><b>3</b><span>Katılmayacaksanız <strong>Listeden çık</strong>'a basın. Böylece sınırınız da boşalır.</span></li>
+          </ol>
+        </figure>
+      </article>
+
+      <article class="step" id="qr">
+        <div class="step-head"><span class="step-no">9</span><h3>Tesise girişte QR kodu okutma</h3></div>
+        <p>Her tesisin girişinde bir QR kod asılıdır. Rezervasyonunuz başladığında telefonunuzun kamerasıyla bu kodu okutun. Giriş, başlangıçtan <strong>10 dakika önce</strong> ile <strong>15 dakika sonrası</strong> arasında yapılabilir.</p>
+        <figure class="shot phone">
+          <div class="pair">
+            <img src="img/qr-1.jpg" alt="Telefonda QR giriş onay ekranı" loading="lazy" width="1170" height="1992">
+            <img src="img/qr-2.jpg" alt="Telefonda giriş kaydedildi ekranı" loading="lazy" width="1170" height="1992">
+          </div>
+          <ol class="keys">
+            <li><b>1</b><span>QR kod okutulunca bu sayfa açılır (oturumunuz kapalıysa önce giriş yapın). <strong>Girişimi kaydet</strong>'e basın.</span></li>
+            <li><b>2</b><span><strong>Giriş kaydedildi</strong> mesajını gördüyseniz işlem tamamdır.</span></li>
+          </ol>
+        </figure>
+        <p class="note warn">İlk 15 dakika içinde giriş yapılmayan rezervasyon otomatik olarak "gelmedi" sayılır. Telefonunuz yoksa salon görevlisine adınızı söyleyin; görevli girişinizi elle işaretleyebilir.</p>
+      </article>
+
+      <article class="step" id="kurallar">
+        <div class="step-head"><span class="step-no">i</span><h3>Kurallar özeti</h3></div>
+        <p>Varsayılan değerler aşağıdadır. SKS, tesis ve rol bazında farklı değerler belirleyebilir; formun sağındaki özet her zaman geçerli değeri gösterir.</p>
+        <div class="table-scroll">
+          <table class="rules">
+            <thead><tr><th>Kural</th><th>Varsayılan</th><th>Açıklama</th></tr></thead>
+            <tbody>
+              <tr><td>En uzun süre</td><td>2 saat</td><td>Tek bir rezervasyonun süresi.</td></tr>
+              <tr><td>Günlük sınır</td><td>Tesis başına 1</td><td>Aynı gün farklı tesisler rezerve edilebilir (ör. sabah basketbol, akşam dans salonu).</td></tr>
+              <tr><td>Haftalık sınır</td><td>Tesis başına 3</td><td>Pazartesi–Pazar arası. Katılımcı olarak yer aldığınız rezervasyonlar da sayılır.</td></tr>
+              <tr><td>En ileri tarih</td><td>14 gün</td><td>Bugünden en fazla 14 gün sonrası.</td></tr>
+              <tr><td>En geç talep</td><td>2 saat önce</td><td>Başlangıca 2 saatten az kala talep oluşturulamaz.</td></tr>
+              <tr><td>Onay</td><td>Zorunlu</td><td>Başlangıç saatine kadar onaylanmayan talep otomatik iptal edilir.</td></tr>
+              <tr><td>Gelmeme</td><td>15 dakika</td><td>QR veya görevli girişi yoksa "gelmedi" sayılır.</td></tr>
+              <tr><td>Yaptırım</td><td>3 ihlal → 14 gün</td><td>30 gün içinde gelmeme veya geç iptal.</td></tr>
+              <tr><td>Tam salon</td><td>Antrenör ve personel</td><td>Voleybol ve takım basketbolu iki potayı birden kapatır. Öğrenciler tek pota rezerve eder.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <!-- ================= ANTRENÖR ================= -->
+    <section class="part" id="antrenor">
+      <div class="part-head"><span class="tag">Antrenör</span><h2>Antrenörler</h2></div>
+      <p class="intro">Antrenörler günlük, haftalık ve süre sınırlarından ve gelmeme yaptırımından muaftır. Rezervasyonları yine SKS onayından geçer. Her hafta tekrarlanan antrenmanlar için SKS'den sabit blok isteyin (bkz. <a href="#blok">23</a>).</p>
+
+      <article class="step" id="takim-rez">
+        <div class="step-head"><span class="step-no">10</span><h3>Takım rezervasyonu (iki pota)</h3></div>
+        <figure class="shot">
+          <img src="img/antrenor-form.jpg" alt="Takım basketbolu rezervasyon formu" loading="lazy" width="2560" height="2000">
+          <ol class="keys">
+            <li><b>1</b><span>Aktivite olarak <strong>Basketbol (Takım)</strong> seçin. Bu aktivite iki potayı birden ayırır.</span></li>
+            <li><b>2</b><span><strong>Takım</strong> seçimi zorunludur. Listede yalnızca antrenörü olduğunuz takımlar görünür.</span></li>
+            <li><b>3</b><span>Gelecek oyuncu sayısını yazın.</span></li>
+          </ol>
+        </figure>
+      </article>
+
+      <article class="step" id="takimlar">
+        <div class="step-head"><span class="step-no">11</span><h3>Takımlarım ve sağlık raporu takibi</h3></div>
+        <p>Menüden <strong>Takımlarım</strong>'ı açın ve bir takım seçin.</p>
+        <figure class="shot">
+          <img src="img/takimlar.jpg" alt="Takımlarım listesi" loading="lazy" width="2024" height="720">
+          <ol class="keys"><li><b>1</b><span>Takım kartı: branş, antrenör ve aktif oyuncu sayısı. Tıklayınca oyuncu listesi açılır.</span></li></ol>
+        </figure>
+        <figure class="shot">
+          <img src="img/takim-detay.jpg" alt="Takım oyuncu listesi" loading="lazy" width="2024" height="1280">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Oyuncu ekle.</strong></span></li>
+            <li><b>2</b><span><strong>Kırmızı:</strong> Sağlık raporunun süresi dolmuş.</span></li>
+            <li><b>3</b><span><strong>Sarı:</strong> 30 gün içinde dolacak. Bu durumda size e-posta da gelir.</span></li>
+            <li><b>4</b><span><strong>Detay:</strong> Oyuncunun kişisel ve sağlık bilgilerini görüntüleyin veya düzenleyin.</span></li>
+          </ol>
+        </figure>
+        <p class="note warn">Oyuncu bilgileri kişisel veridir, sağlık bilgileri özel nitelikli kişisel veridir. Bu bilgileri yalnızca takımın antrenörü ve SKS Admin görebilir ve her görüntüleme kayda geçer.</p>
+      </article>
+
+      <article class="step" id="oyuncu">
+        <div class="step-head"><span class="step-no">12</span><h3>Oyuncu ekleme</h3></div>
+        <figure class="shot">
+          <img src="img/oyuncu-form.jpg" alt="Oyuncu ekleme formu" loading="lazy" width="2560" height="2000">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Öğrenci numarası.</strong> Ad, e-posta ve bölüm üniversite sisteminden otomatik gelir. Yalnızca öğrenciler eklenebilir.</span></li>
+            <li><b>2</b><span>Bu bölümdeki bilgiler veritabanında <strong>şifreli</strong> saklanır.</span></li>
+            <li><b>3</b><span><strong>Sağlık raporu geçerlilik bitişi.</strong> Bu tarihe 30 gün kala size hatırlatma gelir.</span></li>
+            <li><b>4</b><span>Fotoğraf (JPG veya PNG, en fazla 2 MB).</span></li>
+          </ol>
+        </figure>
+        <p class="note tip">Oyuncu detayındaki <strong>Takımdan çıkar</strong> düğmesi oyuncuyu "eski oyuncu" listesine taşır; sağlık ve iletişim bilgileri kalıcı olarak silinir.</p>
+      </article>
+    </section>
+
+    <!-- ================= ONAYCI ================= -->
+    <section class="part" id="onayci">
+      <div class="part-head"><span class="tag">SKS Onaycısı</span><h2>Talepleri onaylama</h2></div>
+      <p class="intro">Tesis onaycıları yalnızca kendilerine atanmış tesislerin taleplerini görür; SKS Admin bütün tesisleri görür. Yeni talep geldiğinde e-posta alırsınız. Bekleyen talep sayısı menüde turuncu rozetle gösterilir.</p>
+
+      <article class="step" id="onay">
+        <div class="step-head"><span class="step-no">13</span><h3>Talepleri onaylama</h3></div>
+        <figure class="shot">
+          <img src="img/onaylar.jpg" alt="Onay bekleyenler ekranı" loading="lazy" width="2560" height="1800">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Özet:</strong> Bekleyen talepler, 4 saat içinde başlayacak olanlar ve önümüzdeki 14 günün onaylı rezervasyonları.</span></li>
+            <li><b>2</b><span><strong>Talep ayrıntısı:</strong> Kişi, numarası ve rolü; tesis, alan, saat, aktivite, kişi sayısı, katılımcılar, ekipman ve not.</span></li>
+            <li><b>3</b><span><strong>Onayla.</strong> Kullanıcıya onay e-postası gider.</span></li>
+            <li><b>4</b><span><strong>Reddet.</strong> Bir sonraki adımda gerekçe istenir.</span></li>
+          </ol>
+        </figure>
+        <p class="note warn">Otomatik onay yoktur. Talep 4 saat içinde onaylanmazsa size hatırlatma e-postası gelir; başlangıç saatine kadar onaylanmazsa talep otomatik iptal edilir ve slot boşa gider. Başlangıcı yakın talepler listenin üstünde ve turuncu çerçeveyle gösterilir.</p>
+      </article>
+
+      <article class="step" id="red">
+        <div class="step-head"><span class="step-no">14</span><h3>Reddetme ve onaylı rezervasyonu iptal etme</h3></div>
+        <figure class="shot">
+          <img src="img/onay-red.jpg" alt="Red gerekçesi alanı" loading="lazy" width="2024" height="840">
+          <ol class="keys"><li><b>1</b><span>Gerekçeyi yazın ve <strong>Reddet</strong>'e basın. Gerekçe kullanıcıya e-postayla iletilir.</span></li></ol>
+        </figure>
+        <p>Onaylı bir rezervasyonu iptal etmeniz gerekirse aynı sayfadaki <strong>Onaylı yaklaşan rezervasyonlar</strong> tablosunda <strong>İptal et</strong>'e basıp gerekçe yazın. SKS'nin yaptığı iptal kullanıcıya geç iptal olarak yazılmaz.</p>
+      </article>
+
+      <article class="step" id="rapor">
+        <div class="step-head"><span class="step-no">15</span><h3>Raporlar</h3></div>
+        <figure class="shot">
+          <img src="img/raporlar.jpg" alt="Raporlar ekranı" loading="lazy" width="2560" height="1800">
+          <ol class="keys">
+            <li><b>1</b><span>Tarih aralığı ve tesis seçip <strong>Göster</strong>'e basın.</span></li>
+            <li><b>2</b><span>Raporu <strong>Excel</strong> veya <strong>PDF</strong> olarak indirin.</span></li>
+            <li><b>3</b><span>Toplam talep, ortalama doluluk, gelmeme oranı ve ortalama onay süresi.</span></li>
+          </ol>
+        </figure>
+        <p>Sayfanın devamında tesis bazında doluluk, gün × saat yoğunluk haritası, rol bazında kullanım, en çok kullananlar, yaptırımlar, onaycı bazında işlem sayıları, takım kullanımı ve hasarlı/kayıp ekipman tabloları yer alır.</p>
+      </article>
+    </section>
+
+    <!-- ================= GÖREVLİ ================= -->
+    <section class="part" id="gorevli">
+      <div class="part-head"><span class="tag">Salon Görevlisi</span><h2>Günlük işlemler</h2></div>
+
+      <article class="step" id="gunluk">
+        <div class="step-head"><span class="step-no">16</span><h3>Günlük liste: katılım ve ekipman</h3></div>
+        <p>Menüden <strong>Günlük Liste</strong>'yi açın. O gün için onaylı bütün rezervasyonlar saat sırasıyla listelenir.</p>
+        <figure class="shot">
+          <img src="img/gunluk.jpg" alt="Günlük liste ekranı" loading="lazy" width="2560" height="1800">
+          <ol class="keys">
+            <li><b>1</b><span>Tesis ve tarihi seçin.</span></li>
+            <li><b>2</b><span><strong>Geldi:</strong> Kişi QR okutamadıysa girişini buradan işaretleyin. QR ile giriş yapanlar otomatik "Geldi" görünür.</span></li>
+            <li><b>3</b><span><strong>Gelmedi:</strong> Gelmeyenleri işaretleyin. Sistemin yanlışlıkla "gelmedi" saydığı birini "Geldi" yaparsanız ilgili yaptırım da kaldırılır.</span></li>
+            <li><b>4</b><span><strong>Teslim et:</strong> Ekipmanı verdiğinizde basın. Geri alırken durumunu (sağlam, hasarlı, kayıp) seçip <strong>Teslim al</strong>'a basın.</span></li>
+          </ol>
+        </figure>
+      </article>
+    </section>
+
+    <!-- ================= ADMIN ================= -->
+    <section class="part" id="admin">
+      <div class="part-head"><span class="tag">SKS Admin</span><h2>Yönetim</h2></div>
+      <p class="intro">Yönetim sayfaları menünün <strong>Yönetim</strong> bölümündedir. Burada yapılan her değişiklik işlem kaydına yazılır.</p>
+
+      <article class="step" id="tesis-liste">
+        <div class="step-head"><span class="step-no">17</span><h3>Tesisler</h3></div>
+        <figure class="shot">
+          <img src="img/admin-tesisler.jpg" alt="Tesis listesi" loading="lazy" width="2560" height="1800">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Yeni tesis</strong> oluşturun. Tesis tek bölümlü, varsayılan saatlerle açılır; sonra düzenlersiniz.</span></li>
+            <li><b>2</b><span><strong>Düzenle:</strong> Ayarlar, bölümler, aktiviteler, saatler, kurallar ve onaycılar.</span></li>
+            <li><b>3</b><span><strong>QR:</strong> Girişe asılacak QR kodu.</span></li>
+          </ol>
+        </figure>
+      </article>
+
+      <article class="step" id="tesis-genel">
+        <div class="step-head"><span class="step-no">18</span><h3>Tesis genel ayarları</h3></div>
+        <figure class="shot">
+          <img src="img/admin-tesis-genel.jpg" alt="Tesis genel ayarları" loading="lazy" width="2560" height="1800">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Slot süresi:</strong> 30 veya 60 dakika. Takvimdeki satırlar buna göre oluşur.</span></li>
+            <li><b>2</b><span><strong>Kapasite:</strong> En fazla kişi sayısı.</span></li>
+            <li><b>3</b><span><strong>İptal süresi:</strong> Başlangıçtan kaç saat önceye kadar iptal geç sayılmaz.</span></li>
+            <li><b>4</b><span><strong>Grup rezervasyonuna açık:</strong> Kapalıysa yalnızca tek kişilik rezervasyon yapılır.</span></li>
+            <li><b>5</b><span><strong>Katılımcı listesi zorunlu:</strong> Açıksa katılımcılar numarayla eklenir ve onların sınırından da düşer.</span></li>
+            <li><b>6</b><span><strong>Roller:</strong> Bu tesisi kimler rezerve edebilir (ör. çalışma odasını mezunlara kapatmak).</span></li>
+          </ol>
+        </figure>
+      </article>
+
+      <article class="step" id="tesis-birim">
+        <div class="step-head"><span class="step-no">19</span><h3>Alt birimler ve çalışma saatleri</h3></div>
+        <figure class="shot">
+          <img src="img/admin-tesis-birim.jpg" alt="Alt birimler ve çalışma saatleri" loading="lazy" width="2560" height="1800">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Alt birimler:</strong> Ayrı ayrı rezerve edilebilen bölümler (Pota A, Pota B). Çakışma kontrolü bölüm düzeyinde yapılır.</span></li>
+            <li><b>2</b><span>Yeni bölüm eklemek için Türkçe ve İngilizce adını yazın.</span></li>
+            <li><b>3</b><span><strong>Çalışma saatleri:</strong> Her gün için açılış–kapanış ya da "Kapalı".</span></li>
+          </ol>
+        </figure>
+      </article>
+
+      <article class="step" id="tesis-aktivite">
+        <div class="step-head"><span class="step-no">20</span><h3>Aktiviteler: voleybol ve basketbol kuralı</h3></div>
+        <p>Spor salonundaki "voleybolda tüm salon, basketbolda tek pota, takımda iki pota" kuralı aktivitelerle kurulur.</p>
+        <figure class="shot">
+          <img src="img/admin-tesis-aktivite.jpg" alt="Aktivite ayarları" loading="lazy" width="2560" height="1800">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Gereken birim:</strong> Aktivitenin kaç bölümü kapatacağı. Voleybol = 2 (tüm salon), Basketbol bireysel = 1, Basketbol takım = 2.</span></li>
+            <li><b>2</b><span><strong>Takım aktivitesi:</strong> İşaretliyse rezervasyonda takım seçmek zorunludur.</span></li>
+            <li><b>3</b><span><strong>Roller:</strong> Bu aktiviteyi kimlerin seçebileceği. Örnekte voleybolda "Öğrenci" işaretsiz, yani tam salonu yalnızca personel ve antrenörler alabilir.</span></li>
+          </ol>
+        </figure>
+      </article>
+
+      <article class="step" id="tesis-kural">
+        <div class="step-head"><span class="step-no">21</span><h3>Kurallar ve onaycılar</h3></div>
+        <figure class="shot">
+          <img src="img/admin-tesis-kural.jpg" alt="Kurallar tablosu ve onaycı seçimi" loading="lazy" width="2560" height="1800">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Kurallar:</strong> Tesis varsayılanı ve rol bazında süre, günlük, haftalık, en ileri tarih ve en geç talep değerleri. Boş bırakılan değer bir üst seviyeden (tesis varsayılanı, sonra sistem ayarı) alınır.</span></li>
+            <li><b>2</b><span><strong>Onaycılar:</strong> Bu tesisin taleplerini onaylayacak kişiler. Birden fazla seçmek için Ctrl (Mac'te Cmd) tuşunu basılı tutun.</span></li>
+            <li><b>3</b><span>QR kodunu görüntüleyin ya da yenileyin.</span></li>
+          </ol>
+        </figure>
+      </article>
+
+      <article class="step" id="tesis-qr">
+        <div class="step-head"><span class="step-no">22</span><h3>QR kodunu yazdırma</h3></div>
+        <figure class="shot">
+          <img src="img/admin-qr.jpg" alt="Yazdırılabilir QR kodu" loading="lazy" width="2560" height="1800">
+          <ol class="keys">
+            <li><b>1</b><span>Tesise özel QR kod. Türkçe ve İngilizce açıklamasıyla birlikte yazdırılır.</span></li>
+            <li><b>2</b><span><strong>Yazdır</strong> ve tesis girişine asın.</span></li>
+          </ol>
+        </figure>
+        <p class="note tip">QR kodunun fotoğrafının dışarıda paylaşıldığından şüphelenirseniz tesis düzenleme sayfasında <strong>QR kodunu yenile</strong>'ye basın. Eski kod hemen geçersiz olur; yenisini yazdırıp asın.</p>
+      </article>
+
+      <article class="step" id="blok">
+        <div class="step-head"><span class="step-no">23</span><h3>Sabit bloklar (tekrarlanan antrenmanlar)</h3></div>
+        <p>Takım antrenmanları ve dersler gibi her hafta tekrarlanan kullanımları bir kerede girin. Bloklar onay gerektirmez ve takvimde mor görünür.</p>
+        <figure class="shot">
+          <img src="img/admin-blok.jpg" alt="Sabit blok önizlemesi" loading="lazy" width="2560" height="1800">
+          <ol class="keys">
+            <li><b>1</b><span>Başlık, aktivite, takım ve alanları seçtikten sonra <strong>günleri</strong> işaretleyin.</span></li>
+            <li><b>2</b><span><strong>Saat ve tarih aralığı</strong> (ör. dönem boyunca). Ardından <strong>Önizle</strong>'ye basın.</span></li>
+            <li><b>3</b><span><strong>Önizleme:</strong> Kaç oturum oluşacağı ve tatil/kapatma nedeniyle atlanan günler.</span></li>
+            <li><b>4</b><span><strong>Çakışan rezervasyonlar:</strong> Kaydederseniz bunlar iptal edilir ve sahiplerine yazdığınız gerekçeyle e-posta gider.</span></li>
+            <li><b>5</b><span><strong>Onayla ve oluştur.</strong></span></li>
+          </ol>
+        </figure>
+      </article>
+
+      <article class="step" id="kapatma">
+        <div class="step-head"><span class="step-no">24</span><h3>Kapatmalar (bakım, turnuva, etkinlik)</h3></div>
+        <figure class="shot">
+          <img src="img/admin-kapatma.jpg" alt="Kapatma formu ve listesi" loading="lazy" width="2560" height="1800">
+          <ol class="keys">
+            <li><b>1</b><span>Tesis seçin. "Tüm tesisler" seçeneği de vardır.</span></li>
+            <li><b>2</b><span>Başlangıç ve bitiş tarih-saati.</span></li>
+            <li><b>3</b><span>Açıklama. Takvimde taralı hücrede ve iptal e-postalarında görünür.</span></li>
+            <li><b>4</b><span>Mevcut kapatmalar. Çakışan rezervasyon varsa kaydetmeden önce listelenir ve onayınız istenir.</span></li>
+          </ol>
+        </figure>
+      </article>
+
+      <article class="step" id="tatil">
+        <div class="step-head"><span class="step-no">25</span><h3>Resmi tatiller</h3></div>
+        <figure class="shot">
+          <img src="img/admin-tatil.jpg" alt="Resmi tatil listesi" loading="lazy" width="2560" height="1800">
+          <ol class="keys">
+            <li><b>1</b><span>Yıllar arasında geçiş yapın.</span></li>
+            <li><b>2</b><span>Tatil listesi. Arife gibi yarım günler "13:00'ten itibaren" kapalıdır. Listenin altındaki formdan yeni tatil ekleyebilirsiniz.</span></li>
+          </ol>
+        </figure>
+        <p class="note warn">Dini bayram tarihleri her yıl değişir. Yılbaşından önce listeyi resmi takvimle karşılaştırın.</p>
+      </article>
+
+      <article class="step" id="kullanici">
+        <div class="step-head"><span class="step-no">26</span><h3>Kullanıcılar ve roller</h3></div>
+        <p>Öğrenci, idari personel, akademik personel ve mezun rolleri üniversite hesabından otomatik gelir. Antrenör, salon görevlisi ve SKS Admin rollerini bu sayfadan siz verirsiniz.</p>
+        <figure class="shot">
+          <img src="img/admin-kullanici.jpg" alt="Kullanıcı yönetimi" loading="lazy" width="2024" height="1240">
+          <ol class="keys">
+            <li><b>1</b><span><strong>İçe aktar:</strong> Henüz hiç giriş yapmamış birine rol vermek ya da onu onaycı yapmak için numarasıyla ekleyin.</span></li>
+            <li><b>2</b><span><strong>Sistem rolleri:</strong> Antrenör, Salon Görevlisi, SKS Admin ve Aktif. <strong>Aktif</strong> işaretini kaldırırsanız kişinin açık oturumu da kapanır.</span></li>
+            <li><b>3</b><span><strong>Yaptırım ver:</strong> Elle rezervasyon yasağı uygulayın. Aktif yasaklar burada <strong>Kaldır</strong> düğmesiyle görünür.</span></li>
+          </ol>
+        </figure>
+        <p class="note tip">Görev değişikliğinde (ör. antrenörün ayrılması) rolleri hemen kaldırın. Yetkileri yalnızca gerektiği kadar verin.</p>
+      </article>
+
+      <article class="step" id="ayarlar">
+        <div class="step-head"><span class="step-no">27</span><h3>Ayarlar ve KVKK metni</h3></div>
+        <figure class="shot">
+          <img src="img/admin-ayarlar.jpg" alt="Sistem ayarları" loading="lazy" width="2560" height="1800">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Yaptırım eşiği</strong> ve yanındaki ayarlar: kaç ihlalde, kaç günlük pencerede, kaç günlük yasak.</span></li>
+            <li><b>2</b><span><strong>Gelmedi sayılma süresi</strong> ve diğer süreler. Varsayılan kurallar, hatırlatma saatleri ve saklama süresi de buradadır.</span></li>
+          </ol>
+        </figure>
+        <p><strong>KVKK Metni</strong> sayfasından Hukuk Biriminin hazırladığı metnin yeni sürümünü yayımlarsınız. Yayımlandığında bütün kullanıcılardan bir sonraki girişlerinde yeniden onay istenir. Sayfada her sürümü kaç kişinin onayladığı da görünür.</p>
+      </article>
+
+      <article class="step" id="islem">
+        <div class="step-head"><span class="step-no">28</span><h3>İşlem kaydı</h3></div>
+        <figure class="shot">
+          <img src="img/admin-islem.jpg" alt="İşlem kaydı ekranı" loading="lazy" width="2560" height="1800">
+          <ol class="keys">
+            <li><b>1</b><span><strong>Zinciri doğrula:</strong> Kayıtların değiştirilip değiştirilmediğini kontrol eder. Sistem bunu her gece kendisi de yapar.</span></li>
+            <li><b>2</b><span>Yeşil mesaj, kayıtlarda değişiklik veya silme olmadığını gösterir. Kırmızı uyarı görürseniz Bilgi Güvenliği birimine bildirin.</span></li>
+            <li><b>3</b><span>İşlem türüne (ör. <code>reservation.</code>), kullanıcıya veya tarihe göre filtreleyin.</span></li>
+          </ol>
+        </figure>
+      </article>
+    </section>
+
+    <!-- ================= SSS ================= -->
+    <section class="part faq" id="sss">
+      <div class="part-head"><span class="tag">Yardım</span><h2>Sık sorulan sorular</h2></div>
+      <details><summary>Talebim neden "Süresi doldu" oldu?</summary><p>Talep başlangıç saatine kadar SKS tarafından onaylanmadığı için otomatik iptal edildi. Bu bir yaptırım sayılmaz. Talebinizi daha erken bir tarih için tekrar oluşturabilirsiniz.</p></details>
+      <details><summary>Takvimde boş görünen bir saati neden seçemiyorum?</summary><p>Seçtiğiniz aktivite birden fazla bölüm gerektiriyor olabilir (ör. voleybol iki potayı birden ister). Ayrıca başlangıca 2 saatten az kalmışsa ya da tarih 14 günden ileriyse talep oluşturulamaz.</p></details>
+      <details><summary>Öğrenciler voleybol rezervasyonu yapabilir mi?</summary><p>Hayır. Voleybol ve takım basketbolu salonun tamamını kapattığı için yalnızca antrenörler ve personel rezerve edebilir. Öğrenciler tek pota basketbol rezerve eder.</p></details>
+      <details><summary>Aynı gün iki farklı tesisi rezerve edebilir miyim?</summary><p>Evet. Günlük sınır her tesis için ayrı uygulanır; örneğin sabah spor salonu, akşam dans salonu rezerve edebilirsiniz.</p></details>
+      <details><summary>Telefonum yanımda değil, QR okutamadım. Ne olur?</summary><p>Salon görevlisine adınızı söyleyin; görevli Günlük Liste'den girişinizi "Geldi" olarak işaretler. Sistem sizi yanlışlıkla "gelmedi" saydıysa görevli bunu düzeltebilir ve ilgili yaptırım kaldırılır.</p></details>
+      <details><summary>Rezervasyon yasağım var, ne zaman biter?</summary><p>Bitiş tarihi Rezervasyonlarım sayfasının üstünde yazar ve size e-postayla da bildirilir. Hatalı olduğunu düşünüyorsanız SKS'ye başvurun; SKS Admin yasağı kaldırabilir.</p></details>
+      <details><summary>E-postaları hangi dilde alırım?</summary><p>Arayüzde seçtiğiniz dilde. Dili giriş ekranından ya da menünün altındaki English / Türkçe düğmesinden değiştirebilirsiniz.</p></details>
+    </section>
+
+    <footer>Yaşar Üniversitesi Sağlık, Kültür ve Spor Daire Başkanlığı · Tesis Rezervasyon Sistemi kullanım kılavuzu · Ekran görüntülerindeki kişi adları ve kayıtlar örnek veridir.</footer>
+  </main>
+</div>
