@@ -24,6 +24,8 @@ Tarayıcı (index.html)  ──MSAL ile giriş──►  Microsoft Entra ID
 ```
 
 > Ayrıca: [`spor-rezervasyon/`](spor-rezervasyon/) — spor tesisi rezervasyon sistemi için tıklanabilir arayüz prototipi.
+>
+> [`yasar-rezervasyon/`](yasar-rezervasyon/) — Yaşar Üniversitesi tesis rezervasyon sistemi (Laravel + MySQL, LDAP, SKS onayı, ISO 27001).
 
 ## Özellikler
 
