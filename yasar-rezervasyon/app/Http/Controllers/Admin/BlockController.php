@@ -53,6 +53,7 @@ class BlockController extends Controller
                 'skipped' => $preview['skipped'],
                 'conflicts' => $preview['conflicts']->map(fn ($r) => ['code' => $r->code, 'user' => $r->user?->name,
                     'time' => $r->starts_at->format('d.m.Y H:i').'–'.$r->ends_at->format('H:i'), 'block' => $r->isBlock()])->all(),
+                'blocked' => $preview['conflicts']->contains(fn ($r) => $r->isBlock()),
             ]);
         }
         $reason = ($data['cancel_reason'] ?? null) ?: $data['title'];

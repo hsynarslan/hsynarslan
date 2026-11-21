@@ -14,7 +14,7 @@
             <td>@if ($f->approvers_count){{ $f->approvers_count }}@else<span class="badge badge-pending">{{ __('Yok – yalnızca SKS Admin') }}</span>@endif</td>
             <td><span class="badge {{ $f->is_active ? 'badge-ok' : '' }}">{{ $f->is_active ? __('Aktif') : __('Pasif') }}</span></td>
             <td class="actions"><a class="btn btn-sm" href="{{ route('admin.facilities.edit', $f) }}">{{ __('Düzenle') }}</a>
-                <a class="btn btn-sm" href="{{ route('admin.facilities.qr', $f) }}">QR</a></td>
+                @if ($f->usesDynamicQr())<a class="btn btn-sm" href="{{ route('kiosk.show', $f) }}">{{ __('Tablet') }}</a>@else<a class="btn btn-sm" href="{{ route('admin.facilities.qr', $f) }}">QR</a>@endif</td>
         </tr>
     @endforeach
     </tbody>

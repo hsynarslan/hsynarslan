@@ -25,6 +25,12 @@
         <div class="field"><label for="capacity">{{ __('Kapasite (kişi)') }}</label><input id="capacity" name="capacity" type="number" min="1" max="1000" required value="{{ old('capacity', $facility->capacity) }}"></div>
         <div class="field"><label for="cancel_deadline_hours">{{ __('İptal süresi (saat önce)') }}</label><input id="cancel_deadline_hours" name="cancel_deadline_hours" type="number" min="0" max="168" required value="{{ old('cancel_deadline_hours', $facility->cancel_deadline_hours) }}">
             <div class="hint">{{ __('Bu süreden sonraki iptaller geç iptal sayılır.') }}</div></div>
+        <div class="field"><label for="checkin_mode">{{ __('QR giriş türü') }}</label>
+            <select id="checkin_mode" name="checkin_mode">
+                <option value="dynamic" @selected(old('checkin_mode', $facility->checkin_mode ?? 'dynamic') === 'dynamic')>{{ __('Dinamik (girişte tablet, önerilen)') }}</option>
+                <option value="static" @selected(old('checkin_mode', $facility->checkin_mode) === 'static')>{{ __('Sabit (basılı QR)') }}</option>
+            </select>
+            <div class="hint">{{ __('Dinamik QR 30 saniyede bir değişir; fotoğrafı çekilip sonradan kullanılamaz.') }}</div></div>
         <div class="field"><label for="sort">{{ __('Sıra') }}</label><input id="sort" name="sort" type="number" min="0" value="{{ old('sort', $facility->sort ?? 0) }}"></div>
     </div>
     <label class="check"><input type="checkbox" name="group_allowed" value="1" data-group-toggle @checked(old('group_allowed', $facility->group_allowed))> {{ __('Grup rezervasyonuna açık') }}</label>
@@ -124,9 +130,23 @@
             <div class="hint">{{ __('Birden fazla seçmek için Ctrl/Cmd tuşunu basılı tutun. Listede yalnızca sisteme en az bir kez giriş yapmış ya da içe aktarılmış personel görünür.') }}</div>
             <button class="btn btn-primary mt" type="submit">{{ __('Onaycıları kaydet') }}</button>
         </form>
+        <h2>{{ __('Salon görevlileri') }}</h2>
+        <p class="hint">{{ __('Bu tesiste katılım ve ekipman işaretleyebilecek görevliler. Görevli yalnızca atandığı tesisleri görür.') }}</p>
+        <form method="post" action="{{ route('admin.facilities.attendants', $facility) }}">@csrf @method('put')
+            <label for="attendants" class="sr-only">{{ __('Salon görevlileri') }}</label>
+            <select id="attendants" name="attendants[]" multiple size="5">
+                @foreach ($attendantCandidates as $c)<option value="{{ $c->id }}" @selected($facility->attendants->contains($c))>{{ $c->name }} ({{ $c->number }})</option>@endforeach
+            </select>
+            <div class="hint">{{ __('Listede yalnızca Kullanıcılar sayfasında "Salon Görevlisi" rolü verilmiş kişiler görünür.') }}</div>
+            <button class="btn btn-primary mt" type="submit">{{ __('Görevlileri kaydet') }}</button>
+        </form>
         <h2>{{ __('QR kodu') }}</h2>
         <div class="actions">
-            <a class="btn" href="{{ route('admin.facilities.qr', $facility) }}">{{ __('QR kodunu göster / yazdır') }}</a>
+            @if ($facility->usesDynamicQr())
+                <a class="btn" href="{{ route('kiosk.show', $facility) }}">{{ __('Giriş tableti ekranını aç') }}</a>
+            @else
+                <a class="btn" href="{{ route('admin.facilities.qr', $facility) }}">{{ __('QR kodunu göster / yazdır') }}</a>
+            @endif
             <form method="post" action="{{ route('admin.facilities.token', $facility) }}" data-confirm="{{ __('Eski QR kodu geçersiz olacak. Devam edilsin mi?') }}">@csrf<button class="btn btn-danger" type="submit">{{ __('QR kodunu yenile') }}</button></form>
         </div>
     </div>

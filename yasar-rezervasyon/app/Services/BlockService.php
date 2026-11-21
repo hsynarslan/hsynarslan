@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Closure;
 use App\Models\Facility;
+use App\Models\FacilityUnit;
 use App\Models\RecurringBlock;
 use App\Models\Reservation;
 use App\Models\User;
@@ -11,6 +12,7 @@ use Carbon\CarbonPeriod;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /** SKS sabit blokları ve kapatmaları. */
 class BlockService
@@ -57,7 +59,7 @@ class BlockService
 
     public function conflicting(Facility $facility, array $unitIds, $start, $end): Collection
     {
-        return Reservation::active()->with('user', 'facility')
+        return Reservation::active()->with('user', 'facility', 'block')
             ->where('facility_id', $facility->id)
             ->overlapping($start, $end)
             ->whereHas('reservationUnits', fn ($q) => $q->whereIn('facility_unit_id', $unitIds))
@@ -67,7 +69,19 @@ class BlockService
     public function create(User $admin, array $data, string $cancelReason): RecurringBlock
     {
         return DB::transaction(function () use ($admin, $data, $cancelReason) {
+            // Aynı anda oluşturulan rezervasyon ve bloklara karşı tesis birimlerini kilitle,
+            // çakışmaları kilit altında yeniden hesapla (önizlemeden sonra değişmiş olabilir).
+            FacilityUnit::where('facility_id', $data['facility_id'])->orderBy('id')->lockForUpdate()->get();
             $preview = $this->preview($data);
+
+            // Mevcut bir sabit bloğun oturumları otomatik iptal edilmez; önce o blok kaldırılmalıdır.
+            $blockClashes = $preview['conflicts']->filter->isBlock();
+            if ($blockClashes->isNotEmpty()) {
+                throw ValidationException::withMessages(['weekdays' => __('Bu saatlerde başka bir sabit blok var (:titles). Önce o bloğu kaldırın veya saatleri değiştirin.', [
+                    'titles' => $blockClashes->map(fn ($r) => $r->block?->title ?? $r->code)->unique()->join(', '),
+                ])]);
+            }
+
             foreach ($preview['conflicts'] as $r) {
                 $this->reservations->cancelByStaff($admin, $r, $cancelReason);
             }
@@ -120,6 +134,7 @@ class BlockService
     public function createClosure(User $admin, array $data): Closure
     {
         return DB::transaction(function () use ($admin, $data) {
+            FacilityUnit::when($data['facility_id'] ?? null, fn ($q, $id) => $q->where('facility_id', $id))->orderBy('id')->lockForUpdate()->get();
             $closure = Closure::create($data + ['created_by' => $admin->id]);
             foreach ($this->closureConflicts($closure->facility_id, $closure->starts_at, $closure->ends_at) as $r) {
                 $this->reservations->cancelByStaff($admin, $r, $closure->reason);

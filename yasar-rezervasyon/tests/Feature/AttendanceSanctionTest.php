@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Reservation;
 use App\Services\BlockService;
+use App\Services\CheckinToken;
 use App\Services\ReservationService;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
@@ -24,8 +25,9 @@ class AttendanceSanctionTest extends TestCase
         $r = $this->approvedFor('ogrenci', '2026-11-25');
         Carbon::setTestNow(Carbon::parse('2026-11-25 09:55'));
         $this->loginAs($this->user('ogrenci'));
-        $this->get(route('checkin.show', $this->gym()->checkin_token))->assertOk();
-        $this->post(route('checkin.store', $this->gym()->checkin_token))->assertOk()->assertSee('Giriş kaydedildi');
+        $url = CheckinToken::url($this->gym());
+        $this->get($url)->assertOk()->assertSee('Girişimi kaydet');
+        $this->post($url)->assertOk()->assertSee('Giriş kaydedildi');
         $this->assertSame('attended', $r->fresh()->attendance);
     }
 
@@ -34,7 +36,7 @@ class AttendanceSanctionTest extends TestCase
         $this->approvedFor('ogrenci', '2026-11-25');
         Carbon::setTestNow(Carbon::parse('2026-11-25 09:00'));
         $this->loginAs($this->user('ogrenci'));
-        $this->post(route('checkin.store', $this->gym()->checkin_token))->assertOk()->assertSee('rezervasyonunuz yok');
+        $this->post(CheckinToken::url($this->gym()))->assertOk()->assertSee('rezervasyonunuz yok');
         $this->post(route('checkin.store', str_repeat('x', 40)))->assertNotFound();
     }
 

@@ -36,3 +36,5 @@ Schedule::command('reservations:remind-users')->everyFiveMinutes()->withoutOverl
 Schedule::command('players:health-warnings')->dailyAt('08:30');
 Schedule::command('retention:purge')->dailyAt('03:15');
 Schedule::command('audit:verify')->dailyAt('03:45');
+// Başarısız e-posta işleri (alıcı adı ve e-postası içerir) 30 gün sonra silinir (KVKK, ISO 27001 A.8.10).
+Schedule::command('queue:prune-failed', ['--hours' => 720])->dailyAt('03:30');

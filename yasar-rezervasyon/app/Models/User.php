@@ -15,6 +15,15 @@ class User extends Authenticatable
         'username', 'ldap_dn', 'name', 'email', 'number', 'department', 'base_role', 'locale', 'last_login_at',
     ];
 
+    /** Yeni oluşturulan (henüz veritabanından okunmamış) kullanıcıların da güvenli varsayılanları olsun. */
+    protected $attributes = [
+        'is_coach' => false,
+        'is_sks_admin' => false,
+        'is_attendant' => false,
+        'is_active' => true,
+        'locale' => 'tr',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -79,9 +88,41 @@ class User extends Authenticatable
         return $this->is_sks_admin || $this->approvableFacilities()->where('facilities.id', $facilityId)->exists();
     }
 
+    public function attendedFacilities(): BelongsToMany
+    {
+        return $this->belongsToMany(Facility::class, 'facility_attendants');
+    }
+
+    /** Görevlinin işlem yapabileceği tesisler (SKS Admin için null = hepsi). */
+    public function attendableFacilityIds(): ?array
+    {
+        if ($this->is_sks_admin) {
+            return null;
+        }
+
+        return $this->is_attendant ? $this->attendedFacilities()->pluck('facilities.id')->all() : [];
+    }
+
+    public function canAttendFacility(int $facilityId): bool
+    {
+        return $this->is_sks_admin
+            || ($this->is_attendant && $this->attendedFacilities()->where('facilities.id', $facilityId)->exists());
+    }
+
+    /** Takım adına rezervasyon yapabilir mi: yalnızca takımın antrenörü veya SKS Admin. */
+    public function canBookForTeam(Team $team): bool
+    {
+        return $this->is_sks_admin || ($this->is_coach && $team->coach_id === $this->id);
+    }
+
     public function reservations(): HasMany
     {
         return $this->hasMany(Reservation::class);
+    }
+
+    public function participations(): HasMany
+    {
+        return $this->hasMany(ReservationParticipant::class);
     }
 
     public function coachedTeams(): HasMany

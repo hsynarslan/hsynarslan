@@ -68,8 +68,9 @@ class ReservationService
             if (! $team) {
                 $fail('team_id', 'Takım aktivitesi için takım seçmelisiniz.');
             }
-            if ($user->is_coach && ! $user->is_sks_admin && $team->coach_id !== $user->id) {
-                $fail('team_id', 'Yalnızca kendi takımınız için rezervasyon yapabilirsiniz.');
+            // Takım adına yalnızca takımın antrenörü veya SKS Admin rezervasyon yapabilir.
+            if (! $user->canBookForTeam($team)) {
+                $fail('team_id', 'Yalnızca antrenörü olduğunuz takım için rezervasyon yapabilirsiniz.');
             }
         }
 
@@ -125,14 +126,22 @@ class ReservationService
             }
         }
 
-        // 11. Günlük ve haftalık limit (sahip + katılımcılar)
-        foreach (collect([$user])->merge($participants) as $person) {
+        // 11. Limitlerin ön kontrolü (kullanıcıya hızlı geri bildirim; kesin kontrol aşağıda kilit altında).
+        $people = collect([$user])->merge($participants);
+        foreach ($people as $person) {
             $this->checkLimits($person, $facility, $start, $person->is($user) ? null : $person->name);
         }
 
-        return DB::transaction(function () use ($user, $facility, $activity, $team, $start, $end, $count, $participants, $input, $fail) {
-            // Yarış durumunu önlemek için tesisin birimlerini kilitle.
-            FacilityUnit::where('facility_id', $facility->id)->lockForUpdate()->get();
+        return DB::transaction(function () use ($user, $facility, $activity, $team, $start, $end, $count, $participants, $people, $input, $fail) {
+            // Eş zamanlı isteklere karşı kilitler. Kilitlenme (deadlock) olmaması için sıra her zaman aynıdır:
+            // önce kullanıcılar (id sırasıyla), sonra tesis birimleri, sonra ekipman.
+            User::whereIn('id', $people->pluck('id')->sort()->values())->orderBy('id')->lockForUpdate()->get();
+            FacilityUnit::where('facility_id', $facility->id)->orderBy('id')->lockForUpdate()->get();
+
+            // 11. Günlük ve haftalık limit — kilit altında yeniden (aynı kullanıcının paralel istekleri burada sıralanır).
+            foreach ($people as $person) {
+                $this->checkLimits($person, $facility, $start, $person->is($user) ? null : $person->name);
+            }
 
             // 12. Birim uygunluğu
             $free = $this->availability->freeUnits($facility, $start, $end);
@@ -145,7 +154,11 @@ class ReservationService
             }
             $units = $free->take($activity->units_required);
 
-            // 13. Ekipman stoku
+            // 13. Ekipman stoku (ekipman birden fazla tesiste kullanılabildiği için ayrıca kilitlenir)
+            $equipmentIds = array_map('intval', array_keys(array_filter($input['equipment'] ?? [], fn ($q) => (int) $q > 0)));
+            if ($equipmentIds) {
+                Equipment::whereIn('id', $equipmentIds)->orderBy('id')->lockForUpdate()->get();
+            }
             $equipment = $this->resolveEquipment($facility, $input['equipment'] ?? [], $start, $end, $fail);
 
             $kind = $team ? 'team' : ($count > 1 ? 'group' : 'individual');
@@ -246,27 +259,46 @@ class ReservationService
         }
     }
 
+    /**
+     * Durum değiştiren her işlem rezervasyon satırını kilitleyip güncel halini okur. Böylece aynı anda gelen
+     * onay, red, iptal ve otomatik sonlandırma birbirinin üzerine yazamaz; ikinci işlem güncel durumu görür.
+     */
+    private function locked(Reservation $r, callable $fn): Reservation
+    {
+        return DB::transaction(function () use ($r, $fn) {
+            $fresh = Reservation::whereKey($r->getKey())->lockForUpdate()->firstOrFail();
+            $fn($fresh);
+            $r->setRawAttributes($fresh->getAttributes(), true);
+
+            return $fresh;
+        });
+    }
+
     public function approve(User $approver, Reservation $r): void
     {
-        $this->assertCanDecide($approver, $r);
-        $r->status = Reservation::APPROVED;
-        $r->decided_by = $approver->id;
-        $r->decided_at = now();
-        $r->save();
-        Audit::log('reservation.approved', $r);
+        $r = $this->locked($r, function (Reservation $r) use ($approver) {
+            $this->assertCanDecide($approver, $r);
+            $r->status = Reservation::APPROVED;
+            $r->decided_by = $approver->id;
+            $r->decided_at = now();
+            $r->save();
+            Audit::log('reservation.approved', $r);
+        });
         $this->notifier->approved($r);
     }
 
     public function reject(User $approver, Reservation $r, string $reason): void
     {
-        $this->assertCanDecide($approver, $r);
-        $r->status = Reservation::REJECTED;
-        $r->decided_by = $approver->id;
-        $r->decided_at = now();
-        $r->rejection_reason = $reason;
-        $r->save();
-        $r->syncUnitLocks();
-        Audit::log('reservation.rejected', $r, ['reason' => $reason]);
+        $r = $this->locked($r, function (Reservation $r) use ($approver, $reason) {
+            $this->assertCanDecide($approver, $r);
+            $r->status = Reservation::REJECTED;
+            $r->decided_by = $approver->id;
+            $r->decided_at = now();
+            $r->rejection_reason = $reason;
+            $r->save();
+            $r->syncUnitLocks();
+            Audit::log('reservation.rejected', $r, ['reason' => $reason]);
+        });
         $this->notifier->rejected($r);
     }
 
@@ -286,23 +318,26 @@ class ReservationService
     /** Sahibinin iptali / geri çekmesi. */
     public function cancelByOwner(User $user, Reservation $r): void
     {
-        if ($r->user_id !== $user->id || $r->isBlock()) {
-            abort(403);
-        }
-        if (! $r->isActive()) {
-            throw ValidationException::withMessages(['reservation' => __('Bu rezervasyon iptal edilemez.')]);
-        }
-        if ($r->starts_at->lte(now())) {
-            throw ValidationException::withMessages(['reservation' => __('Başlamış bir rezervasyon iptal edilemez.')]);
-        }
-        $late = $r->status === Reservation::APPROVED && now()->gt($r->cancelDeadline());
-        $r->status = Reservation::CANCELLED;
-        $r->cancelled_by = $user->id;
-        $r->cancelled_at = now();
-        $r->is_late_cancel = $late;
-        $r->save();
-        $r->syncUnitLocks();
-        Audit::log($late ? 'reservation.cancelled_late' : 'reservation.cancelled', $r);
+        $late = false;
+        $this->locked($r, function (Reservation $r) use ($user, &$late) {
+            if ($r->user_id !== $user->id || $r->isBlock()) {
+                abort(403);
+            }
+            if (! $r->isActive()) {
+                throw ValidationException::withMessages(['reservation' => __('Bu rezervasyon iptal edilemez.')]);
+            }
+            if ($r->starts_at->lte(now())) {
+                throw ValidationException::withMessages(['reservation' => __('Başlamış bir rezervasyon iptal edilemez.')]);
+            }
+            $late = $r->status === Reservation::APPROVED && now()->gt($r->cancelDeadline());
+            $r->status = Reservation::CANCELLED;
+            $r->cancelled_by = $user->id;
+            $r->cancelled_at = now();
+            $r->is_late_cancel = $late;
+            $r->save();
+            $r->syncUnitLocks();
+            Audit::log($late ? 'reservation.cancelled_late' : 'reservation.cancelled', $r);
+        });
         if ($late) {
             $this->sanctions->evaluate($user);
         }
@@ -314,46 +349,70 @@ class ReservationService
         if (! $staff->canApproveFacility($r->facility_id)) {
             abort(403);
         }
-        if (! $r->isActive()) {
-            return;
-        }
-        $r->status = Reservation::CANCELLED;
-        $r->cancelled_by = $staff->id;
-        $r->cancelled_at = now();
-        $r->cancel_reason = $reason;
-        $r->save();
-        $r->syncUnitLocks();
-        Audit::log('reservation.cancelled_by_staff', $r, ['reason' => $reason]);
-        if ($notify && ! $r->isBlock()) {
+        $changed = false;
+        $r = $this->locked($r, function (Reservation $r) use ($staff, $reason, &$changed) {
+            if (! $r->isActive()) {
+                return;
+            }
+            $r->status = Reservation::CANCELLED;
+            $r->cancelled_by = $staff->id;
+            $r->cancelled_at = now();
+            $r->cancel_reason = $reason;
+            $r->save();
+            $r->syncUnitLocks();
+            Audit::log('reservation.cancelled_by_staff', $r, ['reason' => $reason]);
+            $changed = true;
+        });
+        if ($changed && $notify && ! $r->isBlock()) {
             $this->notifier->cancelledByStaff($r->load('participantUsers'));
         }
     }
 
     public function leave(User $user, Reservation $r): void
     {
-        $p = $r->participants()->where('user_id', $user->id)->first();
-        if (! $p) {
-            abort(403);
-        }
-        if ($r->starts_at->lte(now())) {
-            throw ValidationException::withMessages(['reservation' => __('Başlamış bir rezervasyondan çıkılamaz.')]);
-        }
-        $p->update(['removed_at' => now()]);
-        $r->decrement('participant_count');
-        Audit::log('reservation.participant_left', $r);
+        $this->locked($r, function (Reservation $r) use ($user) {
+            $p = $r->participants()->where('user_id', $user->id)->lockForUpdate()->first();
+            if (! $p) {
+                abort(403); // Katılımcı değil ya da zaten ayrılmış.
+            }
+            if (! $r->isActive()) {
+                throw ValidationException::withMessages(['reservation' => __('Bu rezervasyon artık aktif değil.')]);
+            }
+            if ($r->starts_at->lte(now())) {
+                throw ValidationException::withMessages(['reservation' => __('Başlamış bir rezervasyondan çıkılamaz.')]);
+            }
+            $p->update(['removed_at' => now()]);
+            // Sayı azaltılmaz, aktif katılımcılardan yeniden hesaplanır (sahip + kalan katılımcılar).
+            $remaining = $r->participants()->count();
+            $r->participant_count = $r->facility->participant_list_required
+                ? 1 + $remaining
+                : max(1, $r->participant_count - 1);
+            $r->save();
+            Audit::log('reservation.participant_left', $r, ['participant_count' => $r->participant_count]);
+        });
     }
 
+    /** Zamanlanmış görev: başlangıca kadar onaylanmayan talebi sonlandırır. Bu arada onaylandıysa dokunmaz. */
     public function expire(Reservation $r): void
     {
-        $r->status = Reservation::EXPIRED;
-        $r->save();
-        $r->syncUnitLocks();
-        Audit::log('reservation.expired', $r, [], null);
-        $this->notifier->expired($r);
+        $expired = false;
+        $r = $this->locked($r, function (Reservation $r) use (&$expired) {
+            if ($r->status !== Reservation::PENDING) {
+                return;
+            }
+            $r->status = Reservation::EXPIRED;
+            $r->save();
+            $r->syncUnitLocks();
+            Audit::log('reservation.expired', $r, [], null);
+            $expired = true;
+        });
+        if ($expired) {
+            $this->notifier->expired($r);
+        }
     }
 
     /** QR ile giriş. Uygun rezervasyon yoksa null. */
-    public function checkin(User $user, Facility $facility): ?Reservation
+    public function checkin(User $user, Facility $facility, string $method = 'qr'): ?Reservation
     {
         $early = Setting::get('checkin_early_minutes');
         $grace = Setting::get('noshow_grace_minutes');
@@ -375,7 +434,7 @@ class ReservationService
             $r->attendance = 'attended';
             $r->save();
         }
-        Audit::log('reservation.checkin', $r, ['method' => 'qr']);
+        Audit::log('reservation.checkin', $r, ['method' => $method]);
 
         return $r;
     }
@@ -383,45 +442,75 @@ class ReservationService
     /** Görevli işaretlemesi / düzeltmesi. */
     public function markAttendance(User $staff, Reservation $r, string $attendance): void
     {
-        if (! ($staff->is_attendant || $staff->is_sks_admin)) {
+        if (! $staff->canAttendFacility($r->facility_id)) {
             abort(403);
         }
-        if ($r->status !== Reservation::APPROVED || $r->starts_at->isFuture() && $r->starts_at->diffInMinutes(now()) > 60) {
-            throw ValidationException::withMessages(['reservation' => __('Bu rezervasyon için katılım işaretlenemez.')]);
-        }
-        $previous = $r->attendance;
-        $r->attendance = $attendance;
-        $r->attendance_marked_by = $staff->id;
-        $r->attendance_marked_at = now();
-        $r->save();
-        if ($attendance === 'attended' && $r->user_id) {
-            ReservationCheckin::firstOrCreate(
-                ['reservation_id' => $r->id, 'user_id' => $r->user_id],
-                ['method' => 'attendant', 'checked_in_at' => now()],
-            );
-        }
-        Audit::log('reservation.attendance_marked', $r, ['from' => $previous, 'to' => $attendance]);
+        $previous = null;
+        $r = $this->locked($r, function (Reservation $r) use ($staff, $attendance, &$previous) {
+            // Yalnızca onaylı, blok olmayan ve başlamasına en fazla 60 dk kalmış / başlamış rezervasyonlar.
+            if ($r->status !== Reservation::APPROVED || $r->isBlock() || $r->starts_at->gt(now()->addHour())) {
+                throw ValidationException::withMessages(['reservation' => __('Bu rezervasyon için katılım işaretlenemez.')]);
+            }
+            $previous = $r->attendance;
+            $r->attendance = $attendance;
+            $r->attendance_marked_by = $staff->id;
+            $r->attendance_marked_at = now();
+            $r->save();
+            if ($attendance === 'attended' && $r->user_id) {
+                ReservationCheckin::firstOrCreate(
+                    ['reservation_id' => $r->id, 'user_id' => $r->user_id],
+                    ['method' => 'attendant', 'checked_in_at' => now()],
+                );
+            }
+            Audit::log('reservation.attendance_marked', $r, ['from' => $previous, 'to' => $attendance]);
+        });
         if ($r->user && $previous !== $attendance) {
             $this->sanctions->evaluate($r->user, liftIfBelow: $attendance === 'attended');
         }
     }
 
     /** Ekipman teslim/iade (görevli). */
+    /**
+     * Ekipman teslim/iade (görevli). Geçerli durum geçişleri:
+     *   bekliyor --teslim et--> teslim edildi --teslim al--> iade edildi (sağlam / hasarlı / kayıp)
+     */
     public function equipmentAction(User $staff, ReservationEquipment $item, string $action, ?string $condition = null, ?string $note = null): void
     {
-        if (! ($staff->is_attendant || $staff->is_sks_admin)) {
+        $reservation = $item->reservation;
+        if (! $staff->canAttendFacility($reservation->facility_id)) {
             abort(403);
         }
-        if ($action === 'deliver') {
-            $item->delivered_at = now();
-            $item->delivered_by = $staff->id;
-        } else {
-            $item->returned_at = now();
-            $item->returned_by = $staff->id;
-            $item->return_condition = $condition ?? 'ok';
-            $item->note = $note;
-        }
-        $item->save();
-        Audit::log('equipment.'.$action, $item->reservation, ['equipment' => $item->equipment_id, 'condition' => $condition]);
+        DB::transaction(function () use ($staff, $item, $action, $condition, $note) {
+            $item = ReservationEquipment::whereKey($item->id)->lockForUpdate()->firstOrFail();
+            $r = Reservation::whereKey($item->reservation_id)->lockForUpdate()->firstOrFail();
+            $fail = fn (string $m) => throw ValidationException::withMessages(['equipment' => __($m)]);
+
+            if ($action === 'deliver') {
+                if ($r->status !== Reservation::APPROVED) {
+                    $fail('Ekipman yalnızca onaylı rezervasyonlara teslim edilebilir.');
+                }
+                if ($item->delivered_at) {
+                    $fail('Bu ekipman zaten teslim edildi.');
+                }
+                if (! $r->starts_at->isSameDay(now()) && ! now()->between($r->starts_at, $r->ends_at)) {
+                    $fail('Ekipman yalnızca rezervasyon günü teslim edilebilir.');
+                }
+                $item->delivered_at = now();
+                $item->delivered_by = $staff->id;
+            } else {
+                if (! $item->delivered_at) {
+                    $fail('Teslim edilmemiş ekipman iade alınamaz.');
+                }
+                if ($item->returned_at) {
+                    $fail('Bu ekipmanın iadesi zaten alındı.');
+                }
+                $item->returned_at = now();
+                $item->returned_by = $staff->id;
+                $item->return_condition = $condition ?? 'ok';
+                $item->note = $note;
+            }
+            $item->save();
+            Audit::log('equipment.'.$action, $r, ['equipment' => $item->equipment_id, 'condition' => $condition]);
+        });
     }
 }

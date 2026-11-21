@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Sürüm** | 1.0 |
+| **Sürüm** | 1.1 (kod incelemesi düzeltmeleri, bkz. [05-inceleme-yaniti.md](05-inceleme-yaniti.md)) |
 | **Tarih** | 20.11.2026 |
 | **Durum** | Kesinleşti (açık konular bölüm 14'te) |
 | **Kapsam** | Spor salonu, dans salonu, çalışma/toplantı odaları ve benzeri tesislerin rezervasyonu |
@@ -37,7 +37,7 @@ Kullanıcının DN'i hiçbir tanımlı OU'ya uymuyorsa giriş reddedilir.
 | **Antrenör** | Takım ve tam salon rezervasyonu yapar, kendi takımlarının oyuncularını yönetir. Günlük/haftalık/süre limitlerinden ve gelmeme yaptırımından muaftır. |
 | **Tesis Onaycısı** | Kendisine atanmış tesislerin taleplerini görür, onaylar/reddeder; o tesislerin raporlarını görür. Bir tesise birden fazla onaycı atanabilir. |
 | **SKS Admin** | Bütün tesislerin taleplerini onaylar; tesis, kural, onaycı, takım, ekipman, kapatma, tatil, sabit blok, ayar, KVKK metni ve kullanıcı yönetimi; bütün raporlar ve işlem kaydı. |
-| **Salon Görevlisi** | Günün rezervasyon listesini görür; "geldi / gelmedi" işaretler; ekipman teslim eder ve teslim alır. Onay yetkisi yoktur. |
+| **Salon Görevlisi** | **Atandığı tesislerin** günlük listesini görür; "geldi / gelmedi" işaretler; ekipman teslim eder ve teslim alır; giriş tabletini açar. Onay yetkisi yoktur. |
 
 Bir kişide birden fazla rol bulunabilir (ör. akademik personel + tesis onaycısı).
 
@@ -102,7 +102,7 @@ Değerler önce **tesis + rol** kuralına, yoksa **tesis varsayılanına**, yoks
 
 1. Kullanıcının aktif yaptırımı var mı (antrenör muaf)
 2. Tesis aktif mi, kullanıcının rolü tesise ve aktiviteye izinli mi
-3. Takım aktivitesinde takım seçildi mi; antrenör yalnızca kendi takımını seçebilir
+3. Takım aktivitesinde takım seçildi mi; takım adına **yalnızca o takımın antrenörü veya SKS Admin** rezervasyon yapabilir
 4. Başlangıç ve süre slot sınırlarına uyuyor mu
 5. Tesisin o günkü çalışma saatleri içinde mi
 6. Resmi tatil veya kapatma ile çakışıyor mu
@@ -110,7 +110,7 @@ Değerler önce **tesis + rol** kuralına, yoksa **tesis varsayılanına**, yoks
 8. En uzun süre
 9. Kapasite; grup kapalıysa kişi sayısı 1
 10. Katılımcı listesi zorunluysa katılımcılar girilmiş mi; katılımcılar tesise izinli rollerde mi
-11. Günlük ve haftalık limit — **rezervasyonu yapan ve her katılımcı için** (katılımcı olmak da limitten düşer)
+11. Günlük ve haftalık limit — **rezervasyonu yapan ve her katılımcı için** (katılımcı olmak da limitten düşer). Kesin kontrol, ilgili kullanıcı kayıtları kilitlenerek yapılır; eş zamanlı isteklerle aşılamaz
 12. Yeterli sayıda boş alt birim var mı (beklemede ve onaylı rezervasyonlar slotu kilitler)
 13. İstenen ekipman o saat aralığında stokta var mı
 
@@ -139,7 +139,7 @@ Değerler önce **tesis + rol** kuralına, yoksa **tesis varsayılanına**, yoks
 
 ## 7. Sabit bloklar ve kapatmalar
 
-- **Sabit (tekrarlayan) bloklar**: Yalnızca SKS girer. Tesis, birimler (veya aktivite), takım (isteğe bağlı), başlık, haftanın günleri,
+- **Sabit (tekrarlayan) bloklar**: Yalnızca SKS girer. Mevcut bir sabit blokla çakışan yeni blok oluşturulamaz (önce eskisi kaldırılır). Tesis, birimler (veya aktivite), takım (isteğe bağlı), başlık, haftanın günleri,
   saat aralığı, başlangıç–bitiş tarihi. Onay gerektirmez. Çakışan rezervasyonlar önizlemede listelenir; SKS bunları gerekçeyle iptal eder,
   kullanıcılara e-posta gider. Tatil ve kapatma günleri atlanır.
 - **Tek seferlik kapatma**: Bakım, turnuva, etkinlik. Tesis (veya tüm tesisler), başlangıç–bitiş, açıklama. Çakışan rezervasyonlar aynı şekilde iptal edilebilir.
@@ -158,8 +158,9 @@ Değerler önce **tesis + rol** kuralına, yoksa **tesis varsayılanına**, yoks
 
 ## 9. Katılım ve yaptırım
 
-- **QR check-in**: Her tesisin girişinde QR kod bulunur. Kullanıcı telefon kamerasıyla okutur, sistemde oturum açıkken
-  rezervasyonuna giriş yapılır. Pencere: başlangıçtan 10 dk önce – 15 dk sonra.
+- **QR check-in**: Varsayılan olarak tesis girişindeki bir tablet **30 saniyede bir değişen, imzalı** bir QR kod gösterir
+  (önceden çekilmiş fotoğraf çalışmaz). Tablet koyulamayan tesisler için SKS "sabit (basılı) QR" modunu seçebilir.
+  Kullanıcı telefon kamerasıyla okutur, oturum açıkken rezervasyonuna giriş yapılır. Pencere: başlangıçtan 10 dk önce – 15 dk sonra.
 - **Görevli işaretlemesi**: Salon görevlisi "geldi / gelmedi" işaretler ve otomatik kararı düzeltebilir.
 - İlk 15 dakikada check-in yapılmayan onaylı rezervasyon **gelmedi** olarak işaretlenir.
 - **Yaptırım**: 30 gün içinde **3** gelmeme veya geç iptal → **14 gün** rezervasyon yasağı, e-posta bildirimi.
@@ -171,6 +172,7 @@ Değerler önce **tesis + rol** kuralına, yoksa **tesis varsayılanına**, yoks
 - Rezervasyon formunda ekipman ve adet seçilir; o saat aralığındaki kalan stok kontrol edilir.
 - Ekipman talebi rezervasyonla birlikte onaylanır.
 - Görevli teslim ve iade anını, iade durumunu (sağlam / hasarlı / kayıp) işaretler. Hasarlı/kayıp iadeler raporda görünür.
+- Durum sırası zorunludur: teslim yalnızca onaylı rezervasyonda ve rezervasyon günü; iade yalnızca teslimden sonra ve bir kez.
 
 ## 11. Bildirimler (yalnızca e-posta, kullanıcının dilinde)
 

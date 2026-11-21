@@ -121,6 +121,7 @@ class ScheduledTasks
         Reservation::whereNull('anonymized_at')->where('ends_at', '<', $cutoff)->lazyById(500)->each(function (Reservation $r) use (&$n) {
             ReservationParticipant::where('reservation_id', $r->id)->delete();
             $r->checkins()->delete();
+            $r->equipmentItems()->update(['note' => null, 'delivered_by' => null, 'returned_by' => null]);
             $r->forceFill(['user_id' => null, 'notes' => null, 'rejection_reason' => null, 'cancel_reason' => null,
                 'decided_by' => null, 'cancelled_by' => null, 'attendance_marked_by' => null, 'anonymized_at' => now()])->save();
             $n++;

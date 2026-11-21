@@ -68,7 +68,7 @@ class ReservationRulesTest extends TestCase
     public function test_coach_can_only_book_for_own_team(): void
     {
         $other = Team::create(['name' => 'Başka Takım', 'coach_id' => $this->user('akademik')->id]);
-        $this->expectRule(fn () => $this->book($this->user('antrenor'), ['activity_type_id' => $this->activity('Basketbol (Takım)')->id, 'team_id' => $other->id]), 'kendi takımınız');
+        $this->expectRule(fn () => $this->book($this->user('antrenor'), ['activity_type_id' => $this->activity('Basketbol (Takım)')->id, 'team_id' => $other->id]), 'antrenörü olduğunuz takım');
     }
 
     public function test_daily_and_weekly_limits_per_facility(): void

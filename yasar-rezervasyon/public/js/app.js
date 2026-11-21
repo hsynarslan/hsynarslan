@@ -33,6 +33,17 @@
     if (e.target.closest("[data-sidebar-close]")) document.body.classList.remove("nav-open");
   });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") document.body.classList.remove("nav-open"); });
+  // Giriş tableti: QR görselini düzenli yenile, saati göster
+  var qr = document.querySelector("img[data-refresh]");
+  if (qr) {
+    var base = qr.getAttribute("src");
+    setInterval(function () { qr.src = base + "?t=" + Date.now(); }, Math.max(5000, parseInt(qr.getAttribute("data-refresh"), 10) / 2));
+  }
+  var clock = document.querySelector("[data-clock]");
+  if (clock) {
+    var tick = function () { clock.textContent = new Date().toLocaleTimeString(document.documentElement.lang || "tr", { hour: "2-digit", minute: "2-digit" }); };
+    tick(); setInterval(tick, 10000);
+  }
   // Yazdır düğmesi
   document.addEventListener("click", function (e) {
     if (e.target.closest("[data-print]")) { e.preventDefault(); window.print(); }

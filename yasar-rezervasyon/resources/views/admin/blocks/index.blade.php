@@ -43,8 +43,13 @@
                 <ul>@foreach ($p['conflicts'] as $c)<li>{{ $c['code'] }} · {{ $c['time'] }} · {{ $c['user'] }}@if ($c['block']) ({{ __('sabit blok') }})@endif</li>@endforeach</ul></div>
             <div class="field"><label for="b-cr">{{ __('İptal gerekçesi (kullanıcılara gönderilir)') }}</label><input id="b-cr" type="text" name="cancel_reason" maxlength="255" value="{{ old('cancel_reason') }}"></div>
         @endif
-        <input type="hidden" name="confirm" value="1">
-        <button class="btn btn-primary" type="submit">{{ __('Onayla ve oluştur') }}</button>
+        @if (! empty($p['blocked']))
+            <div class="alert alert-danger">{{ __('Bu saatlerde başka bir sabit blok var. Sabit bloklar otomatik iptal edilmez; önce o bloğu kaldırın veya gün/saatleri değiştirin.') }}</div>
+            <button class="btn btn-primary" type="submit">{{ __('Önizle') }}</button>
+        @else
+            <input type="hidden" name="confirm" value="1">
+            <button class="btn btn-primary" type="submit">{{ __('Onayla ve oluştur') }}</button>
+        @endif
     @else
         <button class="btn btn-primary" type="submit">{{ __('Önizle') }}</button>
     @endif

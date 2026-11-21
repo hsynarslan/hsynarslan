@@ -7,9 +7,11 @@ use App\Models\ActivityType;
 use App\Models\Facility;
 use App\Models\FacilityRule;
 use App\Models\FacilityUnit;
+use App\Models\Reservation;
 use App\Models\ReservationUnit;
 use App\Models\User;
 use App\Services\Audit;
+use App\Services\Availability;
 use App\Support\Roles;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
@@ -29,7 +31,7 @@ class FacilityController extends Controller
 
     public function create()
     {
-        return view('admin.facilities.form', ['facility' => new Facility(['slot_minutes' => 60, 'capacity' => 10,
+        return view('admin.facilities.form', ['facility' => new Facility(['slot_minutes' => 60, 'capacity' => 10, 'checkin_mode' => 'dynamic',
             'cancel_deadline_hours' => 2, 'allowed_roles' => Roles::BOOKING, 'is_active' => true])]);
     }
 
@@ -49,10 +51,11 @@ class FacilityController extends Controller
 
     public function edit(Facility $facility)
     {
-        $facility->load('units', 'activities', 'hours', 'rules', 'approvers');
+        $facility->load('units', 'activities', 'hours', 'rules', 'approvers', 'attendants');
         $candidates = User::where('is_active', true)->whereIn('base_role', [Roles::ADMIN_STAFF, Roles::ACADEMIC])->orderBy('name')->get();
+        $attendantCandidates = User::where('is_active', true)->where('is_attendant', true)->orderBy('name')->get();
 
-        return view('admin.facilities.form', compact('facility', 'candidates'));
+        return view('admin.facilities.form', compact('facility', 'candidates', 'attendantCandidates'));
     }
 
     public function update(Request $request, Facility $facility)
@@ -129,6 +132,16 @@ class FacilityController extends Controller
         }
         Audit::log('facility.hours_updated', $facility, $data['hours']);
 
+        // Yeni saatlerin dışında kalan ileri tarihli rezervasyonlar otomatik iptal edilmez; yöneticiye listelenir.
+        $facility->load('hours');
+        $outside = Reservation::active()->where('facility_id', $facility->id)->where('starts_at', '>', now())->get()
+            ->reject(fn ($r) => app(Availability::class)->withinOpeningHours($facility, $r->starts_at, $r->ends_at));
+        if ($outside->isNotEmpty()) {
+            return back()->with('warning', __('Çalışma saatleri kaydedildi. Şu :n rezervasyon yeni saatlerin dışında kalıyor; gerekirse Onay Bekleyenler sayfasından gerekçeyle iptal edin: :codes', [
+                'n' => $outside->count(), 'codes' => $outside->take(15)->pluck('code')->join(', '),
+            ]));
+        }
+
         return back()->with('success', __('Çalışma saatleri kaydedildi.'));
     }
 
@@ -165,6 +178,15 @@ class FacilityController extends Controller
         return back()->with('success', __('Onaycılar kaydedildi.'));
     }
 
+    public function updateAttendants(Request $request, Facility $facility)
+    {
+        $data = $request->validate(['attendants' => ['array'], 'attendants.*' => ['integer', Rule::exists('users', 'id')->where('is_attendant', true)]]);
+        $facility->attendants()->sync($data['attendants'] ?? []);
+        Audit::log('facility.attendants_updated', $facility, ['attendants' => $data['attendants'] ?? []]);
+
+        return back()->with('success', __('Görevliler kaydedildi.'));
+    }
+
     public function regenerateToken(Facility $facility)
     {
         $facility->checkin_token = Facility::newToken();
@@ -195,6 +217,7 @@ class FacilityController extends Controller
             'allowed_roles' => ['required', 'array', 'min:1'],
             'allowed_roles.*' => [Rule::in(Roles::BOOKING)],
             'sort' => ['nullable', 'integer', 'min:0', 'max:1000'],
+            'checkin_mode' => ['required', Rule::in(['dynamic', 'static'])],
         ]);
         $data['group_allowed'] = $request->boolean('group_allowed');
         $data['participant_list_required'] = $request->boolean('participant_list_required') && $data['group_allowed'];

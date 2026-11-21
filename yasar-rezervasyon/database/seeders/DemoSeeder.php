@@ -76,6 +76,8 @@ class DemoSeeder extends Seeder
             User::where('username', 'gorevli')->update(['is_attendant' => true]);
             User::where('username', 'sksadmin')->update(['is_sks_admin' => true]);
             $gym->approvers()->attach(User::where('username', 'idari')->value('id'));
+            $gym->attendants()->attach(User::where('username', 'gorevli')->value('id'));
+            $dance->attendants()->attach(User::where('username', 'gorevli')->value('id'));
 
             Team::create(['name' => 'Yaşar Erkek Basketbol Takımı', 'sport' => 'Basketbol', 'coach_id' => User::where('username', 'antrenor')->value('id')]);
             Team::create(['name' => 'Yaşar Kadın Voleybol Takımı', 'sport' => 'Voleybol', 'coach_id' => User::where('username', 'antrenor')->value('id')]);

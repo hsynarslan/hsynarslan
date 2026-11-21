@@ -6,6 +6,7 @@ use App\Http\Controllers\AttendantController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CheckinController;
+use App\Http\Controllers\KioskController;
 use App\Http\Controllers\KvkkController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReservationController;
@@ -32,6 +33,10 @@ Route::middleware(['auth', 'throttle:app'])->group(function () {
         Route::post('/rezervasyon/{reservation}/iptal', [ReservationController::class, 'cancel'])->name('reservations.cancel');
         Route::post('/rezervasyon/{reservation}/ayril', [ReservationController::class, 'leave'])->name('reservations.leave');
 
+        Route::get('/checkin/{facility}/{window}/{sig}', [CheckinController::class, 'showDynamic'])
+            ->whereNumber(['facility', 'window'])->where('sig', '[a-f0-9]{32}')->name('checkin.dynamic');
+        Route::post('/checkin/{facility}/{window}/{sig}', [CheckinController::class, 'storeDynamic'])
+            ->whereNumber(['facility', 'window'])->where('sig', '[a-f0-9]{32}')->name('checkin.dynamic.store');
         Route::get('/checkin/{token}', [CheckinController::class, 'show'])->name('checkin.show');
         Route::post('/checkin/{token}', [CheckinController::class, 'store'])->name('checkin.store');
 
@@ -48,6 +53,8 @@ Route::middleware(['auth', 'throttle:app'])->group(function () {
             Route::get('/gunluk', [AttendantController::class, 'index'])->name('attendant.index');
             Route::post('/gunluk/{reservation}/katilim', [AttendantController::class, 'attendance'])->name('attendant.attendance');
             Route::post('/gunluk/ekipman/{item}', [AttendantController::class, 'equipment'])->name('attendant.equipment');
+            Route::get('/kiosk/{facility}', [KioskController::class, 'show'])->name('kiosk.show');
+            Route::get('/kiosk/{facility}/qr.svg', [KioskController::class, 'qr'])->name('kiosk.qr');
         });
 
         Route::middleware('role:coach')->group(function () {
@@ -70,6 +77,7 @@ Route::middleware(['auth', 'throttle:app'])->group(function () {
             Route::put('tesisler/{facility}/saatler', [Admin\FacilityController::class, 'updateHours'])->name('facilities.hours');
             Route::put('tesisler/{facility}/kurallar', [Admin\FacilityController::class, 'updateRules'])->name('facilities.rules');
             Route::put('tesisler/{facility}/onaycilar', [Admin\FacilityController::class, 'updateApprovers'])->name('facilities.approvers');
+            Route::put('tesisler/{facility}/gorevliler', [Admin\FacilityController::class, 'updateAttendants'])->name('facilities.attendants');
             Route::post('tesisler/{facility}/qr-yenile', [Admin\FacilityController::class, 'regenerateToken'])->name('facilities.token');
             Route::get('tesisler/{facility}/qr', [Admin\FacilityController::class, 'qr'])->name('facilities.qr');
 

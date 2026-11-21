@@ -301,7 +301,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--bor
 
       <article class="step" id="qr">
         <div class="step-head"><span class="step-no">9</span><h3>Tesise girişte QR kodu okutma</h3></div>
-        <p>Her tesisin girişinde bir QR kod asılıdır. Rezervasyonunuz başladığında telefonunuzun kamerasıyla bu kodu okutun. Giriş, başlangıçtan <strong>10 dakika önce</strong> ile <strong>15 dakika sonrası</strong> arasında yapılabilir.</p>
+        <p>Tesis girişindeki tablet ekranında bir QR kod görünür; kod güvenlik için <strong>30 saniyede bir değişir</strong>. (Bazı tesislerde basılı QR kullanılabilir.) Rezervasyonunuz başladığında telefonunuzun kamerasıyla bu kodu okutun. Kodun fotoğrafını çekip sonradan kullanmak işe yaramaz. Giriş, başlangıçtan <strong>10 dakika önce</strong> ile <strong>15 dakika sonrası</strong> arasında yapılabilir.</p>
         <figure class="shot phone">
           <div class="pair">
             <img src="img/qr-1.jpg" alt="Telefonda QR giriş onay ekranı" loading="lazy" width="1170" height="1992">
@@ -436,7 +436,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--bor
 
       <article class="step" id="gunluk">
         <div class="step-head"><span class="step-no">16</span><h3>Günlük liste: katılım ve ekipman</h3></div>
-        <p>Menüden <strong>Günlük Liste</strong>'yi açın. O gün için onaylı bütün rezervasyonlar saat sırasıyla listelenir.</p>
+        <p>Menüden <strong>Günlük Liste</strong>'yi açın. Size atanmış tesislerde o gün için onaylı bütün rezervasyonlar saat sırasıyla listelenir. Girişteki tablete QR ekranını açmak için <strong>Yönetim → Tesisler → Tablet</strong> bağlantısını (ya da size verilen <code>/kiosk/…</code> adresini) tablette görevli hesabınızla açın.</p>
         <figure class="shot">
           <img src="img/gunluk.jpg" alt="Günlük liste ekranı" loading="lazy" width="2560" height="1800">
           <ol class="keys">
@@ -461,7 +461,7 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--bor
           <ol class="keys">
             <li><b>1</b><span><strong>Yeni tesis</strong> oluşturun. Tesis tek bölümlü, varsayılan saatlerle açılır; sonra düzenlersiniz.</span></li>
             <li><b>2</b><span><strong>Düzenle:</strong> Ayarlar, bölümler, aktiviteler, saatler, kurallar ve onaycılar.</span></li>
-            <li><b>3</b><span><strong>QR:</strong> Girişe asılacak QR kodu.</span></li>
+            <li><b>3</b><span><strong>QR / Tablet:</strong> Dinamik QR kullanan tesislerde giriş tableti ekranı, sabit QR kullananlarda yazdırılacak kod.</span></li>
           </ol>
         </figure>
       </article>
@@ -513,13 +513,14 @@ footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--bor
           <ol class="keys">
             <li><b>1</b><span><strong>Kurallar:</strong> Tesis varsayılanı ve rol bazında süre, günlük, haftalık, en ileri tarih ve en geç talep değerleri. Boş bırakılan değer bir üst seviyeden (tesis varsayılanı, sonra sistem ayarı) alınır.</span></li>
             <li><b>2</b><span><strong>Onaycılar:</strong> Bu tesisin taleplerini onaylayacak kişiler. Birden fazla seçmek için Ctrl (Mac'te Cmd) tuşunu basılı tutun.</span></li>
-            <li><b>3</b><span>QR kodunu görüntüleyin ya da yenileyin.</span></li>
+            <li><b>3</b><span>QR kodu. Aynı kartta tesisin <strong>salon görevlilerini</strong> de seçersiniz; görevli yalnızca atandığı tesislerde işlem yapabilir.</span></li>
           </ol>
         </figure>
       </article>
 
       <article class="step" id="tesis-qr">
-        <div class="step-head"><span class="step-no">22</span><h3>QR kodunu yazdırma</h3></div>
+        <div class="step-head"><span class="step-no">22</span><h3>QR kodu: giriş tableti veya basılı kod</h3></div>
+        <p>Genel ayarlardaki <strong>QR giriş türü</strong> iki seçeneklidir. <strong>Dinamik</strong> (önerilen): girişe bir tablet koyun ve görevli hesabıyla tesisin <em>Tablet</em> ekranını açın; kod 30 saniyede bir değişir. <strong>Sabit</strong>: aşağıdaki sayfadan kodu yazdırıp asın.</p>
         <figure class="shot">
           <img src="img/admin-qr.jpg" alt="Yazdırılabilir QR kodu" loading="lazy" width="2560" height="1800">
           <ol class="keys">

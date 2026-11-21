@@ -11,6 +11,7 @@ SKS'nin onayladığı web uygulaması. PHP 8.3 + Laravel 13 + MySQL 8. Mobil uyu
 | [02 – Veritabanı](docs/02-veritabani.md) | ER diyagramı ve tablolar |
 | [03 – Ekran akışları](docs/03-ekran-akislari.md) | Roller, menüler, ekranlar |
 | [04 – ISO 27001](docs/04-iso27001.md) | Kontrol eşlemesi ve üretim kontrol listesi |
+| [05 – Kod incelemesi yanıtı](docs/05-inceleme-yaniti.md) | v1.0 incelemesindeki bulgular, düzeltmeler ve yük testi sonuçları |
 | [Kullanım kılavuzu](docs/kullanici-kilavuzu/index.html) | Rollere göre, numaralı ekran görüntüleriyle adım adım kılavuz (tarayıcıda açın) |
 
 ## Hızlı başlangıç (geliştirme)
@@ -51,7 +52,14 @@ php artisan test
 ```
 
 İş kuralları (pota/salon çakışması, limitler, roller, tatil, kapatma, ekipman stoku), onay akışı, gelmeme yaptırımı,
-sabit bloklar ve güvenlik (hız sınırı, başlıklar, KVKK, şifreleme, audit zinciri) testleri.
+sabit bloklar, güvenlik (hız sınırı, başlıklar, KVKK, şifreleme, audit zinciri) ve kod incelemesi düzeltmeleri — 53 test.
+
+Eş zamanlılık (yük) testi — yalnızca **MySQL/MariaDB test veritabanında**:
+
+```bash
+php tests/Concurrency/stress.php limit 30   # beklenen: 1 başarılı (günlük sınır)
+php tests/Concurrency/stress.php slot 30    # beklenen: 2 başarılı (2 pota)
+```
 
 ## Üretim kurulumu
 

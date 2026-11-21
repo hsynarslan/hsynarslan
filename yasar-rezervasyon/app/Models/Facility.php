@@ -14,7 +14,7 @@ class Facility extends Model
 
     protected $fillable = [
         'name_tr', 'name_en', 'description_tr', 'description_en', 'slot_minutes', 'capacity', 'group_allowed',
-        'participant_list_required', 'cancel_deadline_hours', 'allowed_roles', 'is_active', 'sort',
+        'participant_list_required', 'cancel_deadline_hours', 'allowed_roles', 'is_active', 'sort', 'checkin_mode',
     ];
 
     protected function casts(): array
@@ -62,6 +62,16 @@ class Facility extends Model
     public function approvers(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'facility_approvers');
+    }
+
+    public function attendants(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'facility_attendants');
+    }
+
+    public function usesDynamicQr(): bool
+    {
+        return $this->checkin_mode !== 'static';
     }
 
     public function equipment(): BelongsToMany

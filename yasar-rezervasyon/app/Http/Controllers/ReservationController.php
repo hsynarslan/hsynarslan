@@ -46,16 +46,17 @@ class ReservationController extends Controller
         $facility = $facilities->firstWhere('id', (int) $request->query('facility', old('facility_id'))) ?? $facilities->first();
         $facility->load('units', 'hours', 'equipment');
 
+        // Takım aktivitelerinde yalnızca antrenörü olunan takımlar (SKS Admin: tüm takımlar).
+        $teams = $user->is_sks_admin
+            ? Team::where('is_active', true)->orderBy('name')->get()
+            : ($user->is_coach ? $user->coachedTeams()->where('is_active', true)->orderBy('name')->get() : collect());
+
         $activities = $facility->activities()->where('is_active', true)->get()
-            ->filter(fn ($a) => $a->allowsAnyRole($user->bookingRoles()))->values();
+            ->filter(fn ($a) => $a->allowsAnyRole($user->bookingRoles()) && (! $a->is_team || $teams->isNotEmpty()))->values();
         $date = rescue(fn () => Carbon::parse($request->query('date', old('date', today()->toDateString()))), today(), false);
 
         $times = collect($availability->daySlots($facility, $date))->map(fn ($m) => Availability::minutesToTime($m));
         $endTimes = collect($availability->daySlots($facility, $date))->map(fn ($m) => Availability::minutesToTime($m + $facility->slot_minutes));
-
-        $teams = $user->is_coach && ! $user->is_sks_admin
-            ? $user->coachedTeams()->where('is_active', true)->get()
-            : Team::where('is_active', true)->orderBy('name')->get();
 
         return view('reservations.create', [
             'facilities' => $facilities, 'facility' => $facility, 'activities' => $activities, 'date' => $date,

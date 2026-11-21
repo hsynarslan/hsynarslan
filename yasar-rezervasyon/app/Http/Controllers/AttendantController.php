@@ -13,7 +13,8 @@ class AttendantController extends Controller
 {
     public function index(Request $request)
     {
-        $facilities = Facility::where('is_active', true)->orderBy('sort')->get();
+        $ids = $request->user()->attendableFacilityIds();
+        $facilities = Facility::where('is_active', true)->when($ids !== null, fn ($q) => $q->whereIn('id', $ids))->orderBy('sort')->get();
         $facility = $facilities->firstWhere('id', (int) $request->query('facility')) ?? $facilities->first();
         $date = rescue(fn () => Carbon::parse($request->query('date', today()->toDateString())), today(), false);
 
