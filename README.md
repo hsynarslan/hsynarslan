@@ -9,6 +9,9 @@ Veritabanı olarak iki seçenek vardır:
 
 Hiçbiri bağlı değilse sayfa örnek verilerle **demo modunda** açılır.
 
+> **Kendi hesabınızla kullanmak mı istiyorsunuz?** Adım adım rehber:
+> **[Kendi kopyanızı kurun](KENDI-KOPYANIZI-KURUN.md)** (GitHub kopyası + kendi Google E-Tablonuz, yaklaşık 25 dakika).
+
 ```
 Tarayıcı (index.html) ──fetch + bağlantı anahtarı──► Apps Script web uygulaması ──► Google E-Tablo
                                                                                     ├─ Görevler

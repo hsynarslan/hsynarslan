@@ -8,6 +8,9 @@ yalnızca bir kez yapılır. Ekranınız İngilizceyse menü adları parantez i�
 
 ---
 
+> **Bu sistemi kendi adresinizle, baştan kurmak mı istiyorsunuz?** Önce
+> [Kendi kopyanızı kurun](../KENDI-KOPYANIZI-KURUN.md) rehberine bakın; bu sayfa oradaki Google adımlarının ayrıntısıdır.
+
 ## 1. E-Tabloyu oluşturun (1 dk)
 
 1. https://sheets.google.com adresini açın.
